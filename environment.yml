@@ -1,0 +1,13 @@
+name: quant-research
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - scipy
+  - seaborn
+  - pandas
+  - requests
+  - matplotlib
+  - numpy
+  - scikit-learn
+prefix: /Users/scofield/miniforge3/envs/quant-research
