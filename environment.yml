@@ -10,4 +10,5 @@ dependencies:
   - matplotlib
   - numpy
   - scikit-learn
+  - ipykernel
 prefix: /Users/scofield/miniforge3/envs/quant-research
