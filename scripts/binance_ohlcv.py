@@ -1,183 +1,64 @@
+import json
+import datetime as dt
+
 import ccxt
 import pandas as pd
 
-
-# 市值排名前30的货币对，binance
-tickers = [
-    "BTC/USDT",
-    "ETH/USDT",
-    "BNB/USDT",
-    "SOL/USDT",
-    "XRP/USDT",
-    "DOGE/USDT",
-    "ADA/USDT",
-    "AVAX/USDT",
-    "SHIB/USDT",
-    "DOT/USDT",
-    "LINK/USDT",
-    "TRX/USDT",
-    "MATIC/USDT",
-    "BCH/USDT",
-    "ICP/USDT",
-    "NEAR/USDT",
-    "UNI/USDT",
-    "APT/USDT",
-    "LTC/USDT",
-    "STX/USDT",
-    "FIL/USDT",
-    "ATOM/USDT",
-    "ETC/USDT",
-    "ARB/USDT",
-    "RONIN/USDT",
-    "RNDR/USDT",
-    "IMX/USDT",
-    "HBAR/USDT",
-    "OP/USDT",
-    "XLM/USDT",
-    "GRT/USDT",
-    "INJ/USDT",
-    "PEPE/USDT",
-    "RUNE/USDT",
-    "VET/USDT",
-    "WIF/USDT",
-    "THETA/USDT",
-    "FTM/USDT",
-    "MKR/USDT",
-    "LDO/USDT",
-    "AR/USDT",
-    "SUI/USDT",
-    "FET/USDT",
-    "TIA/USDT",
-    "SEI/USDT",
-    "FLOKI/USDT",
-    "ALGO/USDT",
-    "FLOW/USDT",
-    "GALA/USDT",
-    "AAVE/USDT",
-    "CFX/USDT",
-    "JUP/USDT",
-    "STRK/USDT",
-    "BONK/USDT",
-    "EGLD/USDT",
-    "QNT/USDT",
-    "DYDX/USDT",
-    "AXS/USDT",
-    "SNX/USDT",
-    "SAND/USDT",
-    "AGIX/USDT",
-    "PYTH/USDT",
-    "MINA/USDT",
-    "ORDI/USDT",
-    "XTZ/USDT",
-    "WLD/USDT",
-    "MANA/USDT",
-    "CHZ/USDT",
-    "AXL/USDT",
-    "XEC/USDT",
-    "APE/USDT",
-    "EOS/USDT",
-    "IOTA/USDT",
-    "NEO/USDT",
-    "KAVA/USDT",
-    "JASMY/USDT",
-    "CAKE/USDT",
-    "PENDLE/USDT",
-    "ROSE/USDT",
-    "KLAY/USDT",
-    "ZRX/USDT",
-    "GNO/USDT",
-    "LUNC/USDT",
-    "BLUR/USDT",
-    "CKB/USDT",
-    "WOO/USDT",
-    "OSMO/USDT",
-    "DYM/USDT",
-    "CRV/USDT",
-]
+import utils
 
 
-# tickers = [
-#     "BTCUSDT",
-#     "ETHUSDT",
-#     "BNBUSDT",
-#     "XRPUSDT",
-#     "SOLUSDT",
-#     "ADAUSDT",
-#     "DOGEUSDT",
-#     "TRXUSDT",
-#     "LINKUSDT",
-#     "AVAXUSDT",
-#     "MATICUSDT",
-#     "DOTUSDT",
-#     "LTCUSDT",
-#     "SHIBUSDT",
-#     "BCHUSDT",
-#     "UNIUSDT",
-#     "ATOMUSDT",
-#     "XLMUSDT",
-#     "XMRUSDT",
-#     "ETCUSDT",
-#     "FILUSDT",
-#     "LDOUSDT",
-#     "HBARUSDT",
-#     "ICPUSDT",
-#     "APTUSDT",
-#     "RUNEUSDT",
-#     "NEARUSDT",
-#     "IMXUSDT",
-#     "VETUSDT",
-#     "OPUSDT",
-#     "MKRUSDT",
-#     "INJUSDT",
-#     "GRTUSDT",
-#     "AAVEUSDT",
-#     "ARBUSDT",
-#     "QNTUSDT",
-#     "RNDRUSDT",
-#     "EGLDUSDT",
-#     "ALGOUSDT",
-# ]
+def main():
+    # Script inputs
+    input_json_file = (
+        "../data/coingecko_coins.json"  # json file with token informations
+    )
+    year = 2024  # year to download ohlcv data
+    timeframe = "1d"  # timeframe for ohlcv data
+    output_csv_file = "../data/binance_daily_ohlcv_2024.csv"  # output csv file
+
+    # Load tokens data from json file
+    with open(input_json_file, "r") as f:
+        coins = json.load(f)
+    print(f"Number of tokens: {len(coins)}")
+
+    # Generate USDT pairs for tokens, exclude stablecoins
+    tickers = [
+        f"{coin['symbol'].upper()}/USDT"
+        for coin in coins
+        if "Stablecoins" not in coin["category"]
+        or "USD Stablecoin" not in coin["category"]
+    ]
+    print(f"Number of Non-stable tokens: {len(tickers)}")
+
+    # Check if the ticker are available on Binance
+    exchange = ccxt.binance()
+    markets = exchange.load_markets()
+    tickers = [ticker for ticker in tickers if ticker in list(markets.keys())]
+    print(f"Number of tokens available on Binance: {len(tickers)}")
+
+    # Download spot ohlcv data from Binance
+    start_date = dt.datetime(year, 1, 1)
+    end_date = dt.datetime(year + 1, 1, 1) - dt.timedelta(days=1)
+
+    df_list = []
+    for ticker in tickers:
+        try:
+            df = utils.get_ohlcv(exchange, ticker, timeframe, start_date, end_date)
+            if not df.empty:
+                df["symbol"] = ticker
+                df_list.append(df)
+                print(f"Downloaded {ticker} data")
+            else:
+                print(f"No data for {ticker}")
+        except Exception as e:
+            print(f"Error downloading {ticker}: {e}")
+
+    df_joined = pd.concat(df_list)
+
+    # Save ohlcv data to csv file
+    df_joined.to_csv(output_csv_file, index=True)
+    print(f"Saved data to {output_csv_file}")
 
 
-# def get_daily_ohlcv(ticker: str) -> pd.DataFrame:
-#     url = "https://api.binance.com/api/v3/klines"
-#     params = {
-#         "symbol": ticker,
-#         "interval": "1d",
-#         "limit": 1000,
-#     }
-#     response = requests.get(url, params=params)
-#     response.raise_for_status()
-#     data = response.json()
-#     return process_ohlcv(data)
-
-
-# def process_ohlcv(data: list) -> pd.DataFrame:
-#     columns = [
-#         "open_time",
-#         "open",
-#         "high",
-#         "low",
-#         "close",
-#         "volume",
-#         "close_time",
-#         "quote_volume",
-#         "num_trades",
-#         "taker_buy_base_volume",
-#         "taker_buy_quote_volume",
-#         "ignore",
-#     ]
-#     df = pd.DataFrame.from_records(data, columns=columns)
-#     return (
-#         df.assign(open_time=pd.to_datetime(df.open_time, unit="ms"))
-#         .drop(columns=["close_time", "ignore"])
-#         .drop_duplicates(subset="open_time", keep="first")
-#         .set_index("open_time")
-#         .astype(float)
-#     )
-
-
-# df = get_daily_ohlcv("BTCUSDT")
-# print(df.head())
-# print(df.tail())
-# print(df.info())
+if __name__ == "__main__":
+    main()
