@@ -1,1 +1,0 @@
-pip freeze | awk -F'[ @]+' '{print $1}' > requirements.txt
