@@ -1,3 +1,3 @@
-# Quant research
+# 量化研究
 
-Generate valuable investment insights through data science
+用数据科学来研究和预测市场。
