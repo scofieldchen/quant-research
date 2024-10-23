@@ -3,11 +3,43 @@ import os
 
 import numpy as np
 import pandas as pd
-import streamlit as st
-import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import plotly.io as pio
+import streamlit as st
+from plotly.subplots import make_subplots
+
+pio.templates.default = "ggplot2"
+
+# 设置页面配置
+st.set_page_config(
+    page_title="TA",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# 使用自定义CSS
+st.markdown(
+    """
+    <style>
+    .stButton button {
+        background-color: #4CAF50; /* 绿色按钮 */
+        color: white;
+        border-radius: 5px;
+    }
+    .stTextInput input {
+        border-radius: 5px;
+    }
+    .stSelectbox select {
+        border-radius: 5px;
+    }
+    .stDateInput input {
+        border-radius: 5px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # UI参数
 SYMBOLS = ["BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "FTM/USDT"]
@@ -126,26 +158,7 @@ def calculate_indicators(
     return ohlcv.dropna()
 
 
-st.title("价格分析")
-
-selected_symbol = st.selectbox("货币对", SYMBOLS)
-selected_timeframe = st.selectbox("时间框架", TIMEFRAMES)
-start_date = pd.to_datetime(
-    st.date_input("开始日期", dt.date.today() - dt.timedelta(days=30))
-)
-end_date = pd.to_datetime(st.date_input("结束日期", dt.date.today()))
-
-# 读取数据并显示
-if start_date < end_date:
-    df = read_ohlcv(selected_symbol, selected_timeframe, start_date, end_date)
-    df = calculate_indicators(df, FISHER_PERIOD, BP_PERIOD, BP_WIDTH, CGOSC_PERIOD)
-    # st.write("数据框:")
-    # st.write(df)
-
-    # 设置主题为 'plotly_dark'
-    pio.templates.default = "plotly_dark"
-
-    # 可视化
+def create_chart(df, selected_symbol):
     fig = make_subplots(rows=4, cols=1, shared_xaxes=True, vertical_spacing=0.02)
 
     # 收盘价
@@ -156,7 +169,12 @@ if start_date < end_date:
         row=1,
         col=1,
     )
-    fig.update_yaxes(row=1, col=1, range=[np.min(df["close"]), np.max(df["close"])])
+    fig.update_yaxes(
+        row=1,
+        col=1,
+        range=[np.min(df["close"]), np.max(df["close"])],
+        title_text="Close",
+    )
 
     # 使用for循环绘制所有与指标相关的子图
     indicators = [
@@ -173,7 +191,7 @@ if start_date < end_date:
             "lower_threshold": -0.8,
         },
         {
-            "name": "Osc",
+            "name": "CenterGravityOsc",
             "column": "cgosc",
             "upper_threshold": 0.8,
             "lower_threshold": -0.8,
@@ -212,7 +230,32 @@ if start_date < end_date:
             col=1,
         )
 
-    fig.update_layout(title=f"{selected_symbol}", height=1200, showlegend=False)
-    st.plotly_chart(fig)
+    fig.update_layout(
+        title=f"Cycle analysis of {selected_symbol}",
+        width=1200,
+        height=800,
+        showlegend=False,
+    )
+    return fig
+
+
+st.title("技术指标 📈")
+
+with st.expander("输入参数", expanded=True):
+    col1, col2 = st.columns(2)
+    with col1:
+        selected_symbol = st.selectbox("货币对 💱", SYMBOLS)
+        start_date = pd.to_datetime(
+            st.date_input("开始日期 📅", dt.date.today() - dt.timedelta(days=30))
+        )
+    with col2:
+        selected_timeframe = st.selectbox("时间框架 ⏳", TIMEFRAMES)
+        end_date = pd.to_datetime(st.date_input("结束日期 📅", dt.date.today()))
+
+if start_date < end_date:
+    df = read_ohlcv(selected_symbol, selected_timeframe, start_date, end_date)
+    df = calculate_indicators(df, FISHER_PERIOD, BP_PERIOD, BP_WIDTH, CGOSC_PERIOD)
+    fig = create_chart(df, selected_symbol)
+    st.plotly_chart(fig, theme=None)
 else:
-    st.error("错误: 开始日期必须早于结束日期")
+    st.error("开始日期必须早于结束日期 ⚠️")
