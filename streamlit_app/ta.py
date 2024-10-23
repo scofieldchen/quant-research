@@ -12,14 +12,6 @@ from indicators import bandpass, fisher_transform, stoch_center_gravity_osc
 
 pio.templates.default = "ggplot2"
 
-# 设置页面配置
-st.set_page_config(
-    page_title="TA",
-    page_icon="📈",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
 # 使用自定义CSS
 st.markdown(
     """
