@@ -3,6 +3,8 @@ import datetime as dt
 
 import pandas as pd
 import streamlit as st
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # UI参数
 DATA_DIR = "../data/yahoo"
@@ -41,9 +43,21 @@ start_date = st.date_input("选择开始日期", dt.datetime(2023, 1, 1))
 end_date = st.date_input("选择结束日期", dt.datetime.today())
 
 # 读取数据并显示最后5行
-prices = read_yahoo(
-    dt.datetime.combine(start_date, dt.datetime.min.time()),
-    dt.datetime.combine(end_date, dt.datetime.min.time())
+prices = read_yahoo(start_date, end_date)
+# st.write("数据框的最后5行：")
+# st.dataframe(prices.tail())
+
+# 用户输入计算相关系数的天数
+corr_period = st.number_input("相关系数窗口(天)", min_value=10, max_value=365, value=90)
+
+corr = prices.tail(corr_period).corr()
+
+fig, ax = plt.subplots(figsize=(12, 8))
+ax.grid(False)  # remove grid
+ax = sns.heatmap(
+    corr, vmin=-1, vmax=1, annot=True, fmt=".1f", ax=ax, annot_kws={"size": 9}
 )
-st.write("数据框的最后5行：")
-st.dataframe(prices.tail())
+_ = ax.set(title=f"{corr_period}-day correlation", xlabel="", ylabel="")
+
+# 在Streamlit前端显示热力图
+st.pyplot(fig)
