@@ -50,7 +50,12 @@ def main():
         asset_id = asset["yahoo_id"]
         output_file = os.path.join(output_dir, f"{asset_name}.csv")
         try:
-            data = yf.download(asset_id, start=start_date, end=end_date, progress=False)
+            data = yf.download(
+                asset_id, start=start_date, end=end_date, progress=False, ignore_tz=True
+            )
+            data.index = data.index.tz_localize(None)  # 剔除时间索引的时区信息
+            data.columns = data.columns.droplevel(1)  # 将多重索引转化为简单索引
+            data = data[["Open", "High", "Low", "Close", "Adj Close", "Volume"]]
             data.to_csv(output_file)
             print(
                 f"[green]{asset_name}[/green]: [blue]{data.index[0]:%Y-%m-%d}[/blue] to [blue]{data.index[-1]:%Y-%m-%d}[/blue]"
