@@ -1,8 +1,8 @@
-import os
 import datetime as dt
+import os
 
 import yfinance as yf
-
+from rich import print
 
 ASSETS = [
     {"category": "Stock index", "asset": "SP500", "yahoo_id": "^GSPC"},
@@ -33,26 +33,30 @@ ASSETS = [
     {"category": "Crypto", "asset": "Bitcoin", "yahoo_id": "BTC-USD"},
     {"category": "Crypto", "asset": "Ethereum", "yahoo_id": "ETH-USD"},
 ]
-START_DATE = dt.datetime(2000, 1, 1)
-END_DATE = dt.datetime.today()
-OUTPUT_DIR = "../data/yahoo"
 
 
 def main():
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    # 输入参数
+    start_date = dt.datetime(2000, 1, 1)
+    end_date = dt.datetime.today()
+    output_dir = "../data/yahoo"
 
+    # 创建输出文件夹
+    os.makedirs(output_dir, exist_ok=True)
+
+    # 下载历史数据
     for asset in ASSETS:
         asset_name = asset["asset"]
         asset_id = asset["yahoo_id"]
-        output_file = os.path.join(OUTPUT_DIR, f"{asset_name}.csv")
+        output_file = os.path.join(output_dir, f"{asset_name}.csv")
         try:
-            data = yf.download(asset_id, start=START_DATE, end=END_DATE)
+            data = yf.download(asset_id, start=start_date, end=end_date, progress=False)
             data.to_csv(output_file)
             print(
-                f"{asset_name}: download data from {data.index[0]:%Y-%m-%d} to {data.index[-1]:%Y-%m-%d}"
+                f"[green]{asset_name}[/green]: [blue]{data.index[0]:%Y-%m-%d}[/blue] to [blue]{data.index[-1]:%Y-%m-%d}[/blue]"
             )
         except Exception as e:
-            print(f"Error downloading {asset_name}: {e}")
+            print(f"[red]Error: {asset_name}[/red]: {e}")
 
 
 if __name__ == "__main__":
