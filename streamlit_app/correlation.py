@@ -1,13 +1,39 @@
-import os
 import datetime as dt
+import os
 
-import pandas as pd
-import streamlit as st
 import matplotlib.pyplot as plt
+import pandas as pd
+import plotly.express as px
 import seaborn as sns
+import streamlit as st
 
-# UI参数
-DATA_DIR = "../data/yahoo"
+# 全局参数
+DATA_DIR = "../data/yahoo"  # 数据文件夹
+ASSETS = [  # 数据文件夹包含的所有资产，作为下框架的选项
+    "Bitcoin",
+    "CAC",
+    "Copper",
+    "Crude oil",
+    "DAX",
+    "ESTX50",
+    "EURUSD",
+    "Ethereum",
+    "FTSE100",
+    "GBPUSD",
+    "Gold",
+    "ICE US Dollar Index",
+    "NASDAQ",
+    "Natural gas",
+    "Nikkei225",
+    "Platinum",
+    "RBOB gasoline",
+    "SP500",
+    "SSE Composite",
+    "Silver",
+    "US 10-Year Bond",
+    "US 2-Year Bond",
+    "USDJPY",
+]
 
 
 def read_yahoo_ohlcv(filepath: str, asset: str) -> pd.DataFrame:
@@ -38,26 +64,45 @@ def read_yahoo(start_date: dt.datetime, end_date: dt.datetime) -> pd.DataFrame:
     return prices
 
 
+def plot_correlation_heatmap(corr, title: str, figsize=(12, 8)):
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.grid(False)  # remove grid
+    ax = sns.heatmap(
+        corr, vmin=-1, vmax=1, annot=True, fmt=".1f", ax=ax, annot_kws={"size": 9}
+    )
+    ax.set(title=title, xlabel="", ylabel="")
+    return fig
+
+
+# UI
 st.title("相关性分析")
-start_date = st.date_input("选择开始日期", dt.datetime(2023, 1, 1))
-end_date = st.date_input("选择结束日期", dt.datetime.today())
+with st.expander("输入参数", expanded=True):
+    col1, col2 = st.columns(2)
+    with col1:
+        asset1 = st.selectbox("选择第一个资产", ASSETS, index=ASSETS.index("Bitcoin"))
+    with col2:
+        asset2 = st.selectbox("选择第二个资产", ASSETS, index=ASSETS.index("SP500"))
 
-# 读取数据并显示最后5行
+    col3, col4, col5 = st.columns(3)
+    with col3:
+        start_date = st.date_input("选择开始日期", value=dt.datetime(2020, 1, 1))
+    with col4:
+        end_date = st.date_input("选择结束日期", value=dt.datetime.today())
+    with col5:
+        corr_period = st.number_input(
+            "滚动系数窗口(天)", min_value=10, max_value=365, value=90
+        )
+
+# 读取数据
 prices = read_yahoo(start_date, end_date)
-# st.write("数据框的最后5行：")
-# st.dataframe(prices.tail())
+asset1_prices = prices[asset1]
+asset2_prices = prices[asset2]
 
-# 用户输入计算相关系数的天数
-corr_period = st.number_input("相关系数窗口(天)", min_value=10, max_value=365, value=90)
+# 计算滚动相关系数
+rolling_corr = asset1_prices.rolling(window=corr_period).corr(asset2_prices)
 
-corr = prices.tail(corr_period).corr()
-
-fig, ax = plt.subplots(figsize=(12, 8))
-ax.grid(False)  # remove grid
-ax = sns.heatmap(
-    corr, vmin=-1, vmax=1, annot=True, fmt=".1f", ax=ax, annot_kws={"size": 9}
+# 使用plotly绘制滚动相关系数的折线图
+fig = px.line(
+    rolling_corr, title=f"{asset1} 和 {asset2} 的 {corr_period}-day 滚动相关系数"
 )
-_ = ax.set(title=f"{corr_period}-day correlation", xlabel="", ylabel="")
-
-# 在Streamlit前端显示热力图
-st.pyplot(fig)
+st.plotly_chart(fig)
