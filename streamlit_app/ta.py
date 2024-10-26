@@ -154,18 +154,18 @@ def create_chart(df, selected_symbol):
     return fig
 
 
-st.title("技术指标 📈")
+st.title("📈 技术指标")
 
 with st.expander("输入参数", expanded=True):
     col1, col2 = st.columns(2)
     with col1:
-        selected_symbol = st.selectbox("货币对 💱", SYMBOLS)
+        selected_symbol = st.selectbox("💱 货币对", SYMBOLS)
         start_date = pd.to_datetime(
-            st.date_input("开始日期 📅", dt.date.today() - dt.timedelta(days=30))
+            st.date_input("📅 开始日期", dt.date.today() - dt.timedelta(days=30))
         )
     with col2:
-        selected_timeframe = st.selectbox("时间框架 ⏳", TIMEFRAMES)
-        end_date = pd.to_datetime(st.date_input("结束日期 📅", dt.date.today()))
+        selected_timeframe = st.selectbox("⏳ 时间框架", TIMEFRAMES)
+        end_date = pd.to_datetime(st.date_input("📅 结束日期", dt.date.today()))
 
 if start_date < end_date:
     df = read_ohlcv(selected_symbol, selected_timeframe, start_date, end_date)
@@ -173,4 +173,4 @@ if start_date < end_date:
     fig = create_chart(df, selected_symbol)
     st.plotly_chart(fig, theme=None)
 else:
-    st.error("开始日期必须早于结束日期 ⚠️")
+    st.error("⚠️ 开始日期必须早于结束日期")

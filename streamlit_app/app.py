@@ -11,7 +11,7 @@ pg = st.navigation([ta_page, correlation_page])
 st.set_page_config(
     page_title="QuantResearch",
     page_icon="📈",
-    layout="wide",
+    layout="centered",
     initial_sidebar_state="expanded",
 )
 
