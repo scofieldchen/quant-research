@@ -23,6 +23,7 @@ ccxt = "^4.4.5"
 click = "^8.1.7"
 rich = "^13.9.2"
 streamlit = "^1.39.0"
+ffn = "^1.1.1"
 
 [build-system]
 requires = ["poetry-core"]
