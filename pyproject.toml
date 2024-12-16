@@ -25,6 +25,7 @@ rich = "^13.9.2"
 streamlit = "^1.39.0"
 ffn = "^1.1.1"
 python-binance = "^1.0.22"
+hmmlearn = "^0.3.3"
 
 [build-system]
 requires = ["poetry-core"]
