@@ -3457,6 +3457,19 @@ watchdog = {version = ">=2.1.5,<6", markers = "platform_system != \"Darwin\""}
 snowflake = ["snowflake-connector-python (>=2.8.0)", "snowflake-snowpark-python[modin] (>=1.17.0)"]
 
 [[package]]
+name = "ta-lib"
+version = "0.5.1"
+description = "Python wrapper for TA-Lib"
+optional = false
+python-versions = "*"
+files = [
+    {file = "TA-Lib-0.5.1.tar.gz", hash = "sha256:2beeacb7f54212d7c5a7a56bcdd65094d8d6d02f0a732246764c0a96172c9d2a"},
+]
+
+[package.dependencies]
+numpy = "*"
+
+[[package]]
 name = "tabulate"
 version = "0.9.0"
 description = "Pretty-print tabular data"
@@ -3954,4 +3967,4 @@ repair = ["scipy (>=1.6.3)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "7191b2fa2ec70028968e635904bf10b4639e573e7212eaf9951eaacbf5cff0b8"
+content-hash = "90b53c5f1965eb2c3d2cd983a0d0bbb2a0cd95503bd82c08975eb99b8e82fabb"
