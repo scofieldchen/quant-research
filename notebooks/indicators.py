@@ -88,3 +88,98 @@ def calculate_fractal_dimension(data: pd.Series, period: int) -> pd.Series:
     return data.rolling(window=period, min_periods=period).apply(
         _fractal_dimension, raw=True
     )
+
+
+def super_smoother_two_pole(x: pd.Series, period: int = 10) -> pd.Series:
+    a = np.exp(-1.414 * np.pi / period)
+    b = 2 * a * np.cos(1.414 * np.pi / period)
+    c2 = b
+    c3 = -a * a
+    c1 = 1 - c2 - c3
+
+    out = np.zeros(len(x))
+    out[0] = x[0]
+    out[1] = x[1]
+
+    for i in range(2, len(x)):
+        out[i] = c1 * (x[i] + x[i - 1]) / 2 + c2 * out[i - 1] + c3 * out[i - 2]
+
+    return pd.Series(out, index=x.index)
+
+
+def super_smoother_three_pole(x: pd.Series, period: int = 10) -> pd.Series:
+    a = np.exp(-np.pi / period)
+    b = 2 * a * np.cos(1.738 * np.pi / period)
+    c = a * a
+    d2 = b + c
+    d3 = -(c + b * c)
+    d4 = c * c
+    d1 = 1 - d2 - d3 - d4
+
+    out = np.zeros(len(x))
+    out[0] = x[0]
+    out[1] = x[1]
+    out[2] = x[2]
+
+    for i in range(3, len(x)):
+        out[i] = (
+            d1 * (x[i] + x[i - 1]) / 2
+            + d2 * out[i - 1]
+            + d3 * out[i - 2]
+            + d4 * out[i - 3]
+        )
+
+    return pd.Series(out, index=x.index)
+
+
+def super_smoother(
+    x: pd.Series, period: int = 10, method: str = "two_pole"
+) -> pd.Series:
+    """
+    Implementation of ehler's supersmoother
+
+    Args:
+        x (pd.Series): input series
+        period (int): cutoff period
+        method (str): 'two_pole' or 'three_pole', 2 Pole Smoother is considered as a better
+            approximation of price, 3 Pole Smoother has superior smoothing
+
+    Returns:
+        pd.Series of smoothing values
+    """
+    if method == "two_pole":
+        return super_smoother_two_pole(x, period)
+    elif method == "three_pole":
+        return super_smoother_three_pole(x, period)
+    else:
+        raise ValueError("Invalid arg method")
+
+
+def lowpass_filter(x: pd.Series, period: int = 10) -> pd.Series:
+    """
+    Lowpass filter by john ehlers
+
+    Args:
+        x (pd.Series): input series
+        period (int): cutoff period, suppress high frequency components with cycle length
+            lower than this value
+
+    Returns:
+        pd.Series with smoothing values
+    """
+    a = 2.0 / (1 + period)
+
+    out = np.zeros(len(x))
+    out[0] = x.iloc[0]
+    out[1] = x.iloc[1]
+
+    for i in range(2, len(x)):
+        out[i] = (
+            (a - 0.25 * a * a) * x.iloc[i]
+            + 0.5 * a * a * x.iloc[i - 1]
+            - (a - 0.75 * a * a) * x.iloc[i - 2]
+            + (2.0 - 2.0 * a) * out[i - 1]
+            - (1.0 - a) * (1.0 - a) * out[i - 2]
+        )
+
+    return pd.Series(out, index=x.index)
