@@ -183,3 +183,51 @@ def lowpass_filter(x: pd.Series, period: int = 10) -> pd.Series:
         )
 
     return pd.Series(out, index=x.index)
+
+
+def peak(series: pd.Series) -> pd.Series:
+    """
+    找出时间序列中的所有局部高点
+    局部高点定义：series(t-1) < series(t) and series(t+1) < series(t)
+
+    参数:
+        series: pd.Series - 输入的时间序列
+    返回:
+        pd.Series - 一个和输入序列长度相同的序列，1表示局部高点，0表示非局部高点
+    """
+    length = len(series)
+
+    if length < 3:
+        return pd.Series([], index=[])
+
+    peak_mask = np.zeros(length, dtype=int)
+
+    for i in range(1, length - 1):
+        if series.iloc[i - 1] < series.iloc[i] and series.iloc[i + 1] < series.iloc[i]:
+            peak_mask[i] = 1
+
+    return pd.Series(peak_mask, index=series.index)
+
+
+def valley(series: pd.Series) -> pd.Series:
+    """
+    找出时间序列中的所有局部低点
+    局部低点定义：series(t-1) > series(t) and series(t+1) > series(t)
+
+    参数:
+        series: pd.Series - 输入的时间序列
+    返回:
+        pd.Series - 一个和输入序列长度相同的序列，1表示局部低点，0表示非局部低点
+    """
+    length = len(series)
+
+    if length < 3:
+        return pd.Series([], index=[])
+
+    valley_mask = np.zeros(length, dtype=int)
+
+    for i in range(1, length - 1):
+        if series.iloc[i - 1] > series.iloc[i] and series.iloc[i + 1] > series.iloc[i]:
+            valley_mask[i] = 1
+
+    return pd.Series(valley_mask, index=series.index)

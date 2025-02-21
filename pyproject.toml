@@ -28,6 +28,7 @@ python-binance = "^1.0.22"
 hmmlearn = "^0.3.3"
 ta-lib = "^0.5.1"
 fredapi = "^0.5.2"
+nbconvert = "^7.16.6"
 
 [build-system]
 requires = ["poetry-core"]
