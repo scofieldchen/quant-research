@@ -158,6 +158,52 @@ class AggTradesStore:
                 for trade_id in range(stats["min_trade_id"], stats["max_trade_id"] + 1):
                     self.trade_id_filter.add(trade_id)
 
+    def get_collection_stats(self, symbol: Optional[str] = None) -> dict:
+        """Get statistics about the data collection.
+
+        Args:
+            symbol: Optional symbol to filter stats
+
+        Returns:
+            Dictionary containing collection statistics
+        """
+        stats = {}
+
+        # Scan all stats files
+        for stats_file in self.stats_dir.glob("*_stats.json"):
+            with open(stats_file) as f:
+                file_stats = json.load(f)
+
+            # Extract symbol from filename
+            file_symbol = stats_file.stem.split("_")[0]
+
+            if symbol and file_symbol != symbol:
+                continue
+
+            if file_symbol not in stats:
+                stats[file_symbol] = {
+                    "min_timestamp": file_stats["min_timestamp"],
+                    "max_timestamp": file_stats["max_timestamp"],
+                    "total_trades": file_stats["num_trades"],
+                    "file_count": 1,
+                    "last_updated": file_stats["last_modified"],
+                }
+            else:
+                current = stats[file_symbol]
+                current["min_timestamp"] = min(
+                    current["min_timestamp"], file_stats["min_timestamp"]
+                )
+                current["max_timestamp"] = max(
+                    current["max_timestamp"], file_stats["max_timestamp"]
+                )
+                current["total_trades"] += file_stats["num_trades"]
+                current["file_count"] += 1
+                current["last_updated"] = max(
+                    current["last_updated"], file_stats["last_modified"]
+                )
+
+        return stats
+
     def read_trades(
         self, symbol: str, start_time: dt.datetime, end_time: dt.datetime
     ) -> pd.DataFrame:

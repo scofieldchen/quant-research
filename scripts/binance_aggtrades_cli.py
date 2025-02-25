@@ -209,64 +209,62 @@ def update(
 
 @app.command()
 def query(
-    symbol: str,
-    start_date: dt.datetime = typer.Argument(..., formats=["%Y-%m-%d"]),
-    end_date: dt.datetime = typer.Argument(..., formats=["%Y-%m-%d"]),
-    stats: bool = typer.Option(False, help="Show statistics summary"),
-    output: Optional[str] = typer.Option(None, help="Export format (csv/json)"),
     data_dir: Path = typer.Option("data", help="Data directory path"),
+    symbol: Optional[str] = typer.Option(None, help="Filter by symbol"),
 ):
-    """Query stored trade data."""
+    """Query data collection statistics."""
     store = AggTradesStore(str(data_dir))
 
-    # Add timezone info
-    start_date = start_date.replace(tzinfo=dt.timezone.utc)
-    end_date = end_date.replace(tzinfo=dt.timezone.utc)
+    with console.status("[bold blue]Analyzing data collection..."):
+        stats = store.get_collection_stats(symbol)
 
-    with console.status("[bold blue]Loading data..."):
-        df = store.read_trades(symbol, start_date, end_date)
-
-    if df.empty:
+    if not stats:
         console.print("[yellow]No data found")
         return
 
-    if stats:
-        table = Table(title=f"Statistics for {symbol}")
-        table.add_column("Metric", style="cyan")
-        table.add_column("Value", style="green")
+    # Create summary table
+    table = Table(title="Data Collection Statistics")
+    table.add_column("Symbol", style="cyan")
+    table.add_column("Start Date", style="green")
+    table.add_column("End Date", style="green")
+    table.add_column("Files", justify="right", style="blue")
+    table.add_column("Total Trades", justify="right", style="blue")
+    table.add_column("Last Updated", style="magenta")
 
-        stats_data = {
-            "Total Trades": f"{len(df):,}",
-            "Time Range": f"{df.timestamp.min()} to {df.timestamp.max()}",
-            "Total Volume": f"{df.quantity.sum():,.2f}",
-            "Average Price": f"{df.price.mean():,.2f}",
-            "Price Range": f"{df.price.min():,.2f} - {df.price.max():,.2f}",
-            "Buyer Maker %": f"{(df.is_buyer_maker.sum() / len(df) * 100):.1f}%",
-        }
+    # Add rows sorted by symbol
+    for symbol in sorted(stats.keys()):
+        symbol_stats = stats[symbol]
+        start_date = dt.datetime.fromisoformat(symbol_stats["min_timestamp"]).strftime(
+            "%Y-%m-%d"
+        )
+        end_date = dt.datetime.fromisoformat(symbol_stats["max_timestamp"]).strftime(
+            "%Y-%m-%d"
+        )
+        last_updated = dt.datetime.fromisoformat(symbol_stats["last_updated"]).strftime(
+            "%Y-%m-%d %H:%M"
+        )
 
-        for metric, value in stats_data.items():
-            table.add_row(metric, str(value))
+        table.add_row(
+            symbol,
+            start_date,
+            end_date,
+            f"{symbol_stats['file_count']:,}",
+            f"{symbol_stats['total_trades']:,}",
+            last_updated,
+        )
 
-        console.print(Panel(table))
+    # Add summary footer
+    table.add_section()
+    table.add_row(
+        f"Total ({len(stats)} symbols)",
+        "",
+        "",
+        f"{sum(s['file_count'] for s in stats.values()):,}",
+        f"{sum(s['total_trades'] for s in stats.values()):,}",
+        "",
+    )
 
-    elif output:
-        output_path = Path(f"{symbol}_{start_date.date()}_{end_date.date()}.{output}")
-        if output == "csv":
-            df.to_csv(output_path, index=False)
-        else:  # json
-            df.to_json(output_path, orient="records", date_format="iso")
-        console.print(f"[green]Data exported to {output_path}")
-
-    else:
-        # Preview mode
-        preview_table = Table(title=f"Preview: First 10 rows for {symbol}")
-        for col in df.columns:
-            preview_table.add_column(col)
-
-        for _, row in df.head(10).iterrows():
-            preview_table.add_row(*[str(v) for v in row])
-
-        console.print(Panel(preview_table))
+    console.print(Panel(table))
 
 
 @app.command()
