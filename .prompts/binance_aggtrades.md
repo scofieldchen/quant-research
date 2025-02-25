@@ -2,9 +2,9 @@
 
 ### 目标 
 
-创建函数 `get_daily_agg_trades(ticker: str, date: datetime.date)`，实现：  
-**输入**：交易对符号（如BTCUSDT）、UTC日期  
-**输出**：包含当日全部聚合交易的Pandas DataFrame  
+创建函数 `get_hourly_agg_trades(ticker: str, date: datetime.date, hour: int)`，实现：  
+**输入**：交易对符号（如BTCUSDT），UTC日期，小时
+**输出**：包含指定时间的全部聚合交易的Pandas DataFrame  
 
 ### 核心需求
 1. 精准时间范围
@@ -46,8 +46,8 @@ API接口：`GET /api/v3/aggTrades`
 ### 核心需求
 
 1. 分层存储结构
-    - 按交易对符号、年、月三级目录分区存储  
-    - 文件名包含交易对符号和时间（如 `BTCUSDT_20240101.parquet`）  
+    - 按交易对符号，年，月，日四级目录分区存储  
+    - 文件名包含交易对符号和具体时间（如 `BTCUSDT_20240101_01.parquet`）  
 
 2. 写入优化
    - 去重机制：基于 `trade_id` 字段自动跳过重复数据  
@@ -75,8 +75,9 @@ data/
 └── symbol=BTCUSDT/  
     └── year=2023/  
         └── month=10/  
-            └── BTCUSDT_20231001.parquet
-            ├── BTCUSDT_20231002.parquet
+          └── day=1/
+            └── BTCUSDT_20231001_01.parquet
+            ├── BTCUSDT_20231001_02.parquet
             ...
 ```
 
