@@ -9,17 +9,19 @@ import requests
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 
-def get_daily_agg_trades(
+def get_hourly_agg_trades(
     symbol: str,
     date: dt.date,
+    hour: int,
     limit: int = 1000,
     request_delay: float = 0.05,
 ) -> pd.DataFrame:
-    """Fetch all aggregated trades for a symbol on a specific date.
+    """Fetch all aggregated trades for a symbol in a specific hour.
 
     Args:
         symbol: Trading pair symbol (e.g. 'BTCUSDT')
         date: UTC date to fetch trades for
+        hour: Hour of the day (0-23) to fetch trades for
         limit: Number of trades to fetch per request
         request_delay: Delay between API requests in seconds
 
@@ -34,9 +36,12 @@ def get_daily_agg_trades(
     Raises:
         requests.exceptions.RequestException: If API request fails after retries
     """
-    # Convert date to UTC timestamp range
-    start_ts = int(dt.datetime.combine(date, dt.time.min).timestamp() * 1000)
-    end_ts = int(dt.datetime.combine(date, dt.time.max).timestamp() * 1000)
+    # Convert date and hour to UTC timestamp range
+    start_dt = dt.datetime.combine(date, dt.time(hour=hour))
+    end_dt = start_dt + dt.timedelta(hours=1)
+
+    start_ts = int(start_dt.timestamp() * 1000)
+    end_ts = int(end_dt.timestamp() * 1000)
 
     @retry(
         stop=stop_after_attempt(4), wait=wait_exponential(multiplier=1, min=2, max=10)
@@ -108,18 +113,42 @@ def get_daily_agg_trades(
     # Sort by timestamp
     df = df.sort_values("timestamp")
 
-    # Verify data is within requested date
-    df = df[(df["timestamp"].dt.date == date)]
+    # Ensure trades are strictly within the requested hour
+    df = df[
+        (df["timestamp"] >= pd.Timestamp(start_dt, tz="UTC"))
+        & (df["timestamp"] < pd.Timestamp(end_dt, tz="UTC"))
+    ]
 
     return df[["trade_id", "timestamp", "price", "quantity", "is_buyer_maker"]]
 
 
+def get_daily_agg_trades(
+    symbol: str,
+    date: dt.date,
+    limit: int = 1000,
+    request_delay: float = 0.05,
+) -> pd.DataFrame:
+    """Fetch all aggregated trades for a symbol for an entire day by hour."""
+    all_trades = []
+
+    for hour in range(24):
+        df = get_hourly_agg_trades(symbol, date, hour, limit, request_delay)
+        all_trades.append(df)
+
+    return pd.concat(all_trades, ignore_index=True) if all_trades else pd.DataFrame()
+
+
 def main():
-    df = get_daily_agg_trades("BTCUSDT", dt.date(2024, 2, 1))
-    print(f"Fetched {len(df)} trades")
+    # Example: Download hour 0 data for Feb 1, 2024
+    df = get_hourly_agg_trades("BTCUSDT", dt.date(2024, 2, 1), hour=0)
+    print(f"Fetched {len(df)} trades for hour 0")
     print(df.head())
     print(df.tail())
     print(df.info())
+
+    # Example: Download full day data
+    # df_full = get_daily_agg_trades("BTCUSDT", dt.date(2024, 2, 1))
+    # print(f"\nFetched {len(df_full)} trades for full day")
 
 
 if __name__ == "__main__":
