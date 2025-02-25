@@ -228,7 +228,6 @@ def query(
     table.add_column("Start Date", style="green")
     table.add_column("End Date", style="green")
     table.add_column("Files", justify="right", style="blue")
-    table.add_column("Total Trades", justify="right", style="blue")
     table.add_column("Last Updated", style="magenta")
 
     # Add rows sorted by symbol
@@ -249,7 +248,6 @@ def query(
             start_date,
             end_date,
             f"{symbol_stats['file_count']:,}",
-            f"{symbol_stats['total_trades']:,}",
             last_updated,
         )
 
@@ -260,7 +258,6 @@ def query(
         "",
         "",
         f"{sum(s['file_count'] for s in stats.values()):,}",
-        f"{sum(s['total_trades'] for s in stats.values()):,}",
         "",
     )
 

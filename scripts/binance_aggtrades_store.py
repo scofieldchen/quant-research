@@ -184,7 +184,6 @@ class AggTradesStore:
                 stats[file_symbol] = {
                     "min_timestamp": file_stats["min_timestamp"],
                     "max_timestamp": file_stats["max_timestamp"],
-                    "total_trades": file_stats["num_trades"],
                     "file_count": 1,
                     "last_updated": file_stats["last_modified"],
                 }
@@ -196,7 +195,6 @@ class AggTradesStore:
                 current["max_timestamp"] = max(
                     current["max_timestamp"], file_stats["max_timestamp"]
                 )
-                current["total_trades"] += file_stats["num_trades"]
                 current["file_count"] += 1
                 current["last_updated"] = max(
                     current["last_updated"], file_stats["last_modified"]
