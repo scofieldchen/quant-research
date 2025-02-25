@@ -55,7 +55,7 @@ class AggTradesStore:
             self.base_dir
             / f"symbol={symbol}"
             / f"year={timestamp.year}"
-            / f"month={timestamp:02d}"
+            / f"month={timestamp.month:02d}"
             / f"day={timestamp.day:02d}"
         )
 
