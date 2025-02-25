@@ -21,7 +21,7 @@ from rich.progress import (
 from rich.table import Table
 
 from binance_aggtrades_store import AggTradesStore
-from fetch_binance_aggtrades import get_daily_agg_trades
+from fetch_binance_aggtrades import get_hourly_agg_trades
 
 app = typer.Typer(help="Binance aggregated trades data management tool")
 console = Console()
@@ -84,60 +84,65 @@ class RetryManager:
 @app.command()
 def download(
     symbols: List[str],
-    start_date: dt.datetime = typer.Argument(..., formats=["%Y-%m-%d"]),
-    end_date: dt.datetime = typer.Argument(..., formats=["%Y-%m-%d"]),
+    start_date: str = typer.Argument(..., help="Start date (YYYY-MM-DD)"),
+    end_date: str = typer.Argument(..., help="End date (YYYY-MM-DD)"),
     data_dir: Path = typer.Option("data", help="Data directory path"),
 ):
     """Download aggregated trades for specified symbols and date range."""
+    # Convert string dates to datetime objects
+    start_dt = dt.datetime.strptime(start_date, "%Y-%m-%d").replace(
+        tzinfo=dt.timezone.utc
+    )
+    end_dt = dt.datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=dt.timezone.utc)
+
     store = AggTradesStore(str(data_dir))
     tracker = DownloadTracker()
     retry_manager = RetryManager()
 
     # Calculate total workload
-    days_per_symbol = (end_date.date() - start_date.date()).days + 1
-    total_tasks = len(symbols) * days_per_symbol
+    days_per_symbol = (end_dt.date() - start_dt.date()).days + 1
+    total_tasks = len(symbols) * days_per_symbol * 24  # 24 hours per day
     tracker.total_size = total_tasks
 
-    with Live(tracker.progress, refresh_per_second=10):
+    with Live(tracker.progress, refresh_per_second=5):
         for symbol in symbols:
             tracker.symbol_progress = tracker.progress.add_task(
                 f"Downloading {symbol}...",
-                total=days_per_symbol,
+                total=days_per_symbol * 24,
             )
 
-            current_date = start_date.date()
-            while current_date <= end_date.date():
-                try:
-                    # Check if data exists
-                    existing_data = store.read_trades(
-                        symbol,
-                        dt.datetime.combine(
-                            current_date, dt.time.min, tzinfo=dt.timezone.utc
-                        ),
-                        dt.datetime.combine(
-                            current_date, dt.time.max, tzinfo=dt.timezone.utc
-                        ),
-                    )
+            current_date = start_dt.date()
+            while current_date <= end_dt.date():
+                for hour in range(24):
+                    try:
+                        # Check if data exists
+                        hour_start = dt.datetime.combine(
+                            current_date, dt.time(hour=hour), tzinfo=dt.timezone.utc
+                        )
+                        hour_end = hour_start + dt.timedelta(hours=1)
 
-                    if existing_data.empty:
-                        df = get_daily_agg_trades(symbol, current_date)
-                        if not df.empty:
-                            store.write_trades(symbol, df)
-                            tracker.update_stats(symbol, current_date, len(df))
-                    else:
-                        tracker.update_stats(symbol, current_date, 0)
+                        existing_data = store.read_trades(symbol, hour_start, hour_end)
 
-                except Exception as e:
-                    console.print(
-                        f"[red]Error downloading {symbol} for {current_date}: {e}"
-                    )
-                    tracker.failed_tasks.append(
-                        {
-                            "symbol": symbol,
-                            "date": current_date.isoformat(),
-                            "error": str(e),
-                        }
-                    )
+                        if existing_data.empty:
+                            df = get_hourly_agg_trades(symbol, current_date, hour)
+                            if not df.empty:
+                                store.write_trades(symbol, df)
+                                tracker.update_stats(symbol, current_date, len(df))
+                        else:
+                            tracker.update_stats(symbol, current_date, 0)
+
+                    except Exception as e:
+                        console.print(
+                            f"[red]Error downloading {symbol} for {current_date} hour {hour}: {e}"
+                        )
+                        tracker.failed_tasks.append(
+                            {
+                                "symbol": symbol,
+                                "date": current_date.isoformat(),
+                                "hour": hour,
+                                "error": str(e),
+                            }
+                        )
 
                 current_date += dt.timedelta(days=1)
 
@@ -188,14 +193,15 @@ def update(
 
             current_date = start_time.date()
             while current_date <= end_time.date():
-                try:
-                    df = get_daily_agg_trades(symbol, current_date)
-                    if not df.empty:
-                        store.write_trades(symbol, df, overwrite=force)
-                except Exception as e:
-                    console.print(
-                        f"[red]Error updating {symbol} for {current_date}: {e}"
-                    )
+                for hour in range(24):
+                    try:
+                        df = get_hourly_agg_trades(symbol, current_date, hour)
+                        if not df.empty:
+                            store.write_trades(symbol, df, overwrite=force)
+                    except Exception as e:
+                        console.print(
+                            f"[red]Error updating {symbol} for {current_date} hour {hour}: {e}"
+                        )
 
                 current_date += dt.timedelta(days=1)
                 progress.advance(task_id)
@@ -293,10 +299,13 @@ def retry(
                 symbol = task["symbol"]
                 date = dt.date.fromisoformat(task["date"])
 
-                df = get_daily_agg_trades(symbol, date)
+                hour = task.get("hour", 0)  # Default to hour 0 for old retry files
+                df = get_hourly_agg_trades(symbol, date, hour)
                 if not df.empty:
                     store.write_trades(symbol, df)
-                    console.print(f"[green]Successfully retried {symbol} for {date}")
+                    console.print(
+                        f"[green]Successfully retried {symbol} for {date} hour {hour}"
+                    )
             except Exception as e:
                 console.print(f"[red]Retry failed for {task}: {e}")
                 new_failed_tasks.append(task)

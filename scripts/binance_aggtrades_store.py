@@ -80,7 +80,7 @@ class AggTradesStore:
             return
 
         # Group by hour and write separate files
-        for timestamp, hour_df in trades_df.groupby(trades_df.timestamp.dt.floor("H")):
+        for timestamp, hour_df in trades_df.groupby(trades_df.timestamp.dt.floor("h")):
             directory, filename = self._get_path_components(symbol, timestamp)
             directory.mkdir(parents=True, exist_ok=True)
 
@@ -95,16 +95,21 @@ class AggTradesStore:
             }
             self._write_wal(wal_entry)
 
-            # Convert to Arrow table with compression
+            # Convert to Arrow table
             table = pa.Table.from_pandas(hour_df)
 
-            # Write parquet file
+            # Check if file exists and handle overwrite
+            if file_path.exists():
+                if overwrite:
+                    file_path.unlink()  # Delete existing file
+                else:
+                    continue  # Skip if file exists and overwrite is False
+
+            # Write parquet file with simpler parameters
             pq.write_table(
                 table,
                 file_path,
-                compression="zstd",
-                compression_level=3,
-                existing_data_behavior="overwrite_or_ignore" if overwrite else "error",
+                compression="snappy",
             )
 
             # Update metadata
