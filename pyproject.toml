@@ -29,6 +29,7 @@ ta-lib = "^0.5.1"
 fredapi = "^0.5.2"
 nbconvert = "^7.16.6"
 typer = "^0.15.1"
+marimo = "^0.11.10"
 
 [build-system]
 requires = ["poetry-core"]
