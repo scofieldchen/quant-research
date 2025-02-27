@@ -1,0 +1,60 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.11.10"
+  },
+  "cells": [
+    {
+      "id": "Hbol",
+      "code_hash": "1d0db38904205bec4d6f6f6a1f6cec3e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "ebd00948d6fb61e644101d1ae0e4682d",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "4300eb1f07754ba9da0133c4132e2dbf",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<table border=\"1\" class=\"dataframe\"><thead><tr style=\"text-align: right;\"><th></th><th>open</th><th>high</th><th>low</th><th>close</th><th>volume</th></tr><tr><th>date</th><th></th><th></th><th></th><th></th><th></th></tr></thead><tbody><tr><th>2014-09-17</th><td>465.864014</td><td>468.174011</td><td>452.421997</td><td>457.334015</td><td>21056800</td></tr><tr><th>2014-09-18</th><td>456.859985</td><td>456.859985</td><td>413.104004</td><td>424.440002</td><td>34483200</td></tr><tr><th>2014-09-19</th><td>424.102997</td><td>427.834991</td><td>384.532013</td><td>394.795990</td><td>37919700</td></tr><tr><th>2014-09-20</th><td>394.673004</td><td>423.295990</td><td>389.882996</td><td>408.903992</td><td>36863600</td></tr><tr><th>2014-09-21</th><td>408.084991</td><td>412.425995</td><td>393.181000</td><td>398.821014</td><td>26580100</td></tr><tr><th>...</th><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td></tr><tr><th>2025-02-03</th><td>97681.101562</td><td>102514.171875</td><td>91242.890625</td><td>101405.421875</td><td>115400897748</td></tr><tr><th>2025-02-04</th><td>101398.718750</td><td>101745.617188</td><td>96208.109375</td><td>97871.820312</td><td>73002130211</td></tr><tr><th>2025-02-05</th><td>97878.007812</td><td>99113.210938</td><td>96174.828125</td><td>96615.445312</td><td>49125911241</td></tr><tr><th>2025-02-06</th><td>96610.640625</td><td>99168.609375</td><td>95707.351562</td><td>96593.296875</td><td>45302471947</td></tr><tr><th>2025-02-07</th><td>96647.351562</td><td>97778.257812</td><td>96489.375000</td><td>96937.937500</td><td>48601858048</td></tr></tbody></table><p>3797 rows \u00d7 5 columns</p>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "9f7a2414636fd4f8857d83d25a909bc4",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    }
+  ]
+}
