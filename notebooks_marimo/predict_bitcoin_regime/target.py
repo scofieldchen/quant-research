@@ -21,25 +21,47 @@ def _():
     return Dict, List, Tuple, go, make_subplots, np, pd, talib
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _(Dict, List, Tuple, go, make_subplots, np, pd, talib):
+    def lowpass_filter(x: pd.Series, period: int = 10) -> pd.Series:
+        """
+        低通滤波器
+
+        Args:
+            x (pd.Series): 时间序列输入，通常是价格或其它指标
+            period (int): 截断窗口, 压制频率低于该窗口的高频波动
+
+        Returns:
+            pd.Series，输入的移动平滑
+        """
+        a = 2.0 / (1 + period)
+
+        out = np.zeros(len(x))
+        out[0] = x.iloc[0]
+        out[1] = x.iloc[1]
+
+        for i in range(2, len(x)):
+            out[i] = (
+                (a - 0.25 * a * a) * x.iloc[i]
+                + 0.5 * a * a * x.iloc[i - 1]
+                - (a - 0.75 * a * a) * x.iloc[i - 2]
+                + (2.0 - 2.0 * a) * out[i - 1]
+                - (1.0 - a) * (1.0 - a) * out[i - 2]
+            )
+
+        return pd.Series(out, index=x.index)
+
+
     def calculate_market_state(
         df: pd.DataFrame,
-        n1: int = 5,
-        n2: int = 20,
-        atr_multiplier: float = 2.0
+        lowpass_period: int = 200,
+        atr_multiplier: float = 1.0
     ) -> pd.Series:
         """计算市场状态，1代表上涨，-1代表下跌，0代表震荡。
 
-        基于移动平均、ATR波动率通道和动量指标来判断市场状态。
-        当价格突破波动率通道且短期均线高于长期均线，并且动量大于1时，判断为上涨；
-        当价格跌破波动率通道且短期均线低于长期均线，并且动量小于1时，判断为下跌；
-        其他情况判断为震荡。
-
         Args:
             df: 包含高开低收价格的时间序列数据框，索引应为时间序列。
-            n1: 短期移动平均线周期，默认为5。
-            n2: 长期移动平均线周期，默认为20。
+            lowpass_period: 低通滤波器的回溯期，默认为200。
             atr_multiplier: ATR乘数，用于计算波动率通道的宽度，默认为2.0。
 
         Returns:
@@ -48,22 +70,18 @@ def _(Dict, List, Tuple, go, make_subplots, np, pd, talib):
 
         close = df['close']
 
-        # 计算移动平均
-        fast_ma = talib.EMA(close, timeperiod=n1)
-        slow_ma = talib.EMA(close, timeperiod=n2)
+        # 计算趋势线
+        trend = lowpass_filter(close, lowpass_period)
 
         # 根据ATR构建波动性通道
-        atr = talib.ATR(df['high'], df['low'], close, timeperiod=n2)
-        upper_band = slow_ma + atr * atr_multiplier
-        lower_band = slow_ma - atr * atr_multiplier
-
-        # 计算短期动量
-        momentum = (close - close.shift(n1)) / close.shift(n1)
+        atr = talib.ATR(df['high'], df['low'], close, timeperiod=14)
+        upper_band = trend + atr * atr_multiplier
+        lower_band = trend - atr * atr_multiplier
 
         # 市场状态判定规则
         market_state = pd.Series(np.zeros(len(close), dtype=int), index=close.index)
-        market_state[(close > upper_band) & (fast_ma > slow_ma) & (momentum > 0.01)] = 1
-        market_state[(close < lower_band) & (fast_ma < slow_ma) & (momentum < -0.01)] = -1
+        market_state[(trend.diff() > 0) & (close > upper_band)] = 1
+        market_state[(trend.diff() < 0) & (close < lower_band)] = -1
 
         return market_state
 
@@ -131,6 +149,7 @@ def _(Dict, List, Tuple, go, make_subplots, np, pd, talib):
     return (
         calculate_market_state,
         identify_market_state_periods,
+        lowpass_filter,
         visualize_market_state,
     )
 
@@ -148,12 +167,11 @@ def _(pd):
 
 @app.cell
 def _(mo):
-    n1 = mo.ui.number(start=5, stop=50, step=1, value=20, label="Fast MA period")
-    n2 = mo.ui.number(start=50, stop=300, step=10, value=100, label="Slow MA period")
+    lowpass_period = mo.ui.number(start=100, stop=500, step=10, value=200, label="Lowpass period")
     atr_multiplier = mo.ui.number(start=0.5, stop=3.0, step=0.1, value=1.5, label="ATR multiplier")
 
-    mo.hstack([n1, n2, atr_multiplier])
-    return atr_multiplier, n1, n2
+    mo.vstack([lowpass_period, atr_multiplier])
+    return atr_multiplier, lowpass_period
 
 
 @app.cell
@@ -162,18 +180,13 @@ def _(
     btcusd,
     calculate_market_state,
     identify_market_state_periods,
-    mo,
-    n1,
-    n2,
+    lowpass_period,
     visualize_market_state,
 ):
-    if n1.value < n2.value:
-        # 使用 .copy() 避免修改原始数据
-        states = calculate_market_state(btcusd.copy(), int(n1.value), int(n2.value), atr_multiplier.value)
-        state_periods = identify_market_state_periods(states.copy())
-        visualize_market_state(btcusd.copy(), states.copy(), state_periods.copy())
-    else:
-        mo.md("## Error: Fast MA period must be less than Slow MA period.")
+    # 使用 .copy() 避免修改原始数据
+    states = calculate_market_state(btcusd.copy(), int(lowpass_period.value), atr_multiplier.value)
+    state_periods = identify_market_state_periods(states.copy())
+    visualize_market_state(btcusd.copy(), states.copy(), state_periods.copy())
     return state_periods, states
 
 

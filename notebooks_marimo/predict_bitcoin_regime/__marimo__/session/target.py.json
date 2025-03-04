@@ -32,6 +32,19 @@
     },
     {
       "id": "vblA",
+      "code_hash": "893451fc06a5282d6ddab5185f83d516",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "bkHC",
       "code_hash": "4300eb1f07754ba9da0133c4132e2dbf",
       "outputs": [
         {
@@ -44,16 +57,28 @@
       "console": []
     },
     {
-      "id": "bkHC",
-      "code_hash": "9f7a2414636fd4f8857d83d25a909bc4",
+      "id": "lEQa",
+      "code_hash": "37bf1b6365013a87636fb5514bcd6d13",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/plain": ""
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><div><marimo-ui-element object-id='lEQa-0' random-id='ce64264f-d2da-0abf-9323-f606cb890649'><marimo-number data-initial-value='200' data-label='&quot;&lt;span class=&#92;&quot;markdown prose dark:prose-invert&#92;&quot;&gt;&lt;span class=&#92;&quot;paragraph&#92;&quot;&gt;Lowpass period&lt;/span&gt;&lt;/span&gt;&quot;' data-start='100' data-stop='500' data-step='10' data-debounce='false' data-full-width='false'></marimo-number></marimo-ui-element></div><div><marimo-ui-element object-id='lEQa-1' random-id='45f52173-f395-f5b8-69f4-0bfd4da93dbe'><marimo-number data-initial-value='1.5' data-label='&quot;&lt;span class=&#92;&quot;markdown prose dark:prose-invert&#92;&quot;&gt;&lt;span class=&#92;&quot;paragraph&#92;&quot;&gt;ATR multiplier&lt;/span&gt;&lt;/span&gt;&quot;' data-start='0.5' data-stop='3.0' data-step='0.1' data-debounce='false' data-full-width='false'></marimo-number></marimo-ui-element></div></div>"
           }
         }
       ],
+      "console": []
+    },
+    {
+      "id": "PKri",
+      "code_hash": "b68ffbf8351809302134814bfdba0b0b",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "Xref",
+      "code_hash": null,
+      "outputs": [],
       "console": []
     }
   ]
