@@ -19,7 +19,121 @@
     },
     {
       "id": "HosA",
-      "code_hash": "ea7f3f4ae31406ea26abc8f9da5b065d",
+      "code_hash": null,
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "e248b710aa9ef0b03efd16193ddb2314",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "f069e8df0a082fa727ebb44e6b13d35d",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "52ca99453b9a168af28cf04b75d6c048",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<table border=\"1\" class=\"dataframe\"><thead><tr style=\"text-align: right;\"><th></th><th>target</th></tr><tr><th>date</th><th></th></tr></thead><tbody><tr><th>2014-09-17</th><td>0.0</td></tr><tr><th>2014-09-18</th><td>0.0</td></tr><tr><th>2014-09-19</th><td>0.0</td></tr><tr><th>2014-09-20</th><td>0.0</td></tr><tr><th>2014-09-21</th><td>0.0</td></tr><tr><th>...</th><td>...</td></tr><tr><th>2025-02-03</th><td>0.0</td></tr><tr><th>2025-02-04</th><td>0.0</td></tr><tr><th>2025-02-05</th><td>0.0</td></tr><tr><th>2025-02-06</th><td>0.0</td></tr><tr><th>2025-02-07</th><td>NaN</td></tr></tbody></table><p>3797 rows \u00d7 1 columns</p>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lEQa",
+      "code_hash": "19a3dcb7883b836aaafb187aa09024cd",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<table border=\"1\" class=\"dataframe\"><thead><tr style=\"text-align: right;\"><th></th><th>EMA_10_DIFF</th><th>EMA_10_DIFF_PCT</th><th>EMA_50_DIFF</th><th>EMA_50_DIFF_PCT</th><th>EMA_200_DIFF</th><th>EMA_200_DIFF_PCT</th><th>TREND_DIFF_RATIO_10_50</th><th>TREND_DIFF_RATIO_10_200</th><th>TREND_DIFF_RATIO_50_200</th><th>RSI_14</th><th>...</th><th>ATR_RATIO</th><th>ATR_100</th><th>BB_WIDTH</th><th>BB_POSITION</th><th>VOLUME_MA_20_DIFF</th><th>VOLUME_MA_100_DIFF</th><th>VOLUME_RATIO</th><th>OBV_DIFF</th><th>LAG_1_CLOSE_DIFF</th><th>LAG_5_CLOSE_DIFF</th></tr><tr><th>date</th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th></tr></thead><tbody><tr><th>2015-04-05</th><td>1.571723</td><td>0.027898</td><td>0.073200</td><td>0.006930</td><td>-0.499952</td><td>-0.160291</td><td>-0.020399</td><td>-0.183081</td><td>-0.166070</td><td>52.432264</td><td>...</td><td>0.704252</td><td>15.066683</td><td>0.158336</td><td>0.635214</td><td>-9.334500e+04</td><td>3.238700e+04</td><td>0.875795</td><td>1.964920e+07</td><td>-0.625000</td><td>-3.302002</td></tr><tr><th>2015-04-06</th><td>0.357594</td><td>0.006338</td><td>-0.129906</td><td>-0.012304</td><td>-0.545783</td><td>-0.175293</td><td>-0.018525</td><td>-0.180488</td><td>-0.165020</td><td>48.785808</td><td>...</td><td>0.696636</td><td>14.988247</td><td>0.115499</td><td>0.563389</td><td>-7.315000e+04</td><td>4.849000e+04</td><td>0.871868</td><td>-2.003420e+07</td><td>6.900986</td><td>3.048004</td></tr><tr><th>2015-04-07</th><td>-0.127789</td><td>-0.002266</td><td>-0.215479</td><td>-0.020426</td><td>-0.563358</td><td>-0.181267</td><td>-0.018201</td><td>-0.179408</td><td>-0.164196</td><td>47.185598</td><td>...</td><td>0.678973</td><td>14.874364</td><td>0.115172</td><td>0.489754</td><td>-1.927030e+06</td><td>6.790800e+04</td><td>0.804564</td><td>-1.846740e+07</td><td>-5.105988</td><td>5.733002</td></tr><tr><th>2015-04-08</th><td>-1.587825</td><td>-0.028335</td><td>-0.526950</td><td>-0.050053</td><td>-0.638926</td><td>-0.206008</td><td>-0.022351</td><td>-0.182854</td><td>-0.164173</td><td>41.956141</td><td>...</td><td>0.679798</td><td>14.821941</td><td>0.115718</td><td>0.237969</td><td>-1.132280e+06</td><td>1.778390e+05</td><td>0.761607</td><td>-3.008640e+07</td><td>-2.312012</td><td>1.317001</td></tr><tr><th>2015-04-09</th><td>-1.543859</td><td>-0.027720</td><td>-0.559070</td><td>-0.053219</td><td>-0.645962</td><td>-0.208714</td><td>-0.026226</td><td>-0.186154</td><td>-0.164235</td><td>41.145884</td><td>...</td><td>0.672145</td><td>14.740901</td><td>0.115186</td><td>0.220560</td><td>1.593400e+05</td><td>9.115200e+04</td><td>0.764627</td><td>-2.164350e+07</td><td>-8.157990</td><td>-0.625000</td></tr><tr><th>...</th><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td></tr><tr><th>2025-02-03</th><td>-47.350033</td><td>-0.002097</td><td>103.180391</td><td>0.025566</td><td>184.019767</td><td>0.220349</td><td>0.027721</td><td>0.222913</td><td>0.189927</td><td>50.975261</td><td>...</td><td>1.301132</td><td>3383.534575</td><td>0.079784</td><td>0.352691</td><td>3.081561e+09</td><td>9.581280e+08</td><td>1.019124</td><td>1.154009e+11</td><td>-2966.929688</td><td>2370.734375</td></tr><tr><th>2025-02-04</th><td>-681.213948</td><td>-0.030370</td><td>-39.438509</td><td>-0.009776</td><td>147.028510</td><td>0.175744</td><td>0.021239</td><td>0.212569</td><td>0.187351</td><td>44.562433</td><td>...</td><td>1.309569</td><td>3405.074308</td><td>0.087911</td><td>-0.011474</td><td>7.598103e+08</td><td>5.628082e+08</td><td>1.022108</td><td>-7.300213e+10</td><td>3716.445312</td><td>1032.093750</td></tr><tr><th>2025-02-05</th><td>-785.788684</td><td>-0.035307</td><td>-87.161509</td><td>-0.021625</td><td>133.064296</td><td>0.158798</td><td>0.014183</td><td>0.201209</td><td>0.184411</td><td>42.514510</td><td>...</td><td>1.289004</td><td>3400.407393</td><td>0.098872</td><td>-0.064132</td><td>-2.488935e+08</td><td>1.032605e+08</td><td>1.016437</td><td>-4.912591e+10</td><td>-3533.601562</td><td>-2330.281250</td></tr><tr><th>2025-02-06</th><td>-646.945003</td><td>-0.029257</td><td>-84.611977</td><td>-0.021010</td><td>131.519891</td><td>0.156708</td><td>0.008496</td><td>0.191570</td><td>0.181532</td><td>42.477449</td><td>...</td><td>1.275221</td><td>3401.015897</td><td>0.108573</td><td>0.017840</td><td>-1.329325e+09</td><td>-1.323940e+08</td><td>0.997281</td><td>-4.530247e+10</td><td>-1256.375000</td><td>-1749.117188</td></tr><tr><th>2025-02-07</th><td>-466.656707</td><td>-0.021204</td><td>-67.778541</td><td>-0.016842</td><td>133.640495</td><td>0.158980</td><td>0.004456</td><td>0.184087</td><td>0.178834</td><td>43.305625</td><td>...</td><td>1.238097</td><td>3379.894566</td><td>0.114518</td><td>0.102939</td><td>-9.218988e+07</td><td>7.955220e+07</td><td>0.994535</td><td>4.860186e+10</td><td>-22.148438</td><td>-2966.929688</td></tr></tbody></table><p>3597 rows \u00d7 25 columns</p>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "PKri",
+      "code_hash": "04c48475edc36760bca94fd0f383d058",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "Xref",
+      "code_hash": "dc3f8dc52c89c97903227a5c2f281da3",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='Xref-0' random-id='4966c2f7-ce73-6901-4267-b3106bd82efb'><marimo-multiselect data-initial-value='[&quot;EMA_10_DIFF&quot;, &quot;EMA_10_DIFF_PCT&quot;, &quot;EMA_50_DIFF&quot;, &quot;EMA_50_DIFF_PCT&quot;, &quot;EMA_200_DIFF&quot;, &quot;EMA_200_DIFF_PCT&quot;, &quot;TREND_DIFF_RATIO_10_50&quot;, &quot;TREND_DIFF_RATIO_10_200&quot;, &quot;TREND_DIFF_RATIO_50_200&quot;, &quot;RSI_14&quot;, &quot;RSI_28&quot;, &quot;MACD&quot;, &quot;MACD_SIGNAL&quot;, &quot;MACD_HIST&quot;, &quot;ATR_20&quot;, &quot;ATR_RATIO&quot;, &quot;ATR_100&quot;, &quot;BB_WIDTH&quot;, &quot;BB_POSITION&quot;, &quot;VOLUME_MA_20_DIFF&quot;, &quot;VOLUME_MA_100_DIFF&quot;, &quot;VOLUME_RATIO&quot;, &quot;OBV_DIFF&quot;, &quot;LAG_1_CLOSE_DIFF&quot;, &quot;LAG_5_CLOSE_DIFF&quot;]' data-label='&quot;&lt;span class=&#92;&quot;markdown prose dark:prose-invert&#92;&quot;&gt;&lt;span class=&#92;&quot;paragraph&#92;&quot;&gt;&#92;u9009&#92;u62e9&#92;u7279&#92;u5f81&lt;/span&gt;&lt;/span&gt;&quot;' data-options='[&quot;EMA_10_DIFF&quot;, &quot;EMA_10_DIFF_PCT&quot;, &quot;EMA_50_DIFF&quot;, &quot;EMA_50_DIFF_PCT&quot;, &quot;EMA_200_DIFF&quot;, &quot;EMA_200_DIFF_PCT&quot;, &quot;TREND_DIFF_RATIO_10_50&quot;, &quot;TREND_DIFF_RATIO_10_200&quot;, &quot;TREND_DIFF_RATIO_50_200&quot;, &quot;RSI_14&quot;, &quot;RSI_28&quot;, &quot;MACD&quot;, &quot;MACD_SIGNAL&quot;, &quot;MACD_HIST&quot;, &quot;ATR_20&quot;, &quot;ATR_RATIO&quot;, &quot;ATR_100&quot;, &quot;BB_WIDTH&quot;, &quot;BB_POSITION&quot;, &quot;VOLUME_MA_20_DIFF&quot;, &quot;VOLUME_MA_100_DIFF&quot;, &quot;VOLUME_RATIO&quot;, &quot;OBV_DIFF&quot;, &quot;LAG_1_CLOSE_DIFF&quot;, &quot;LAG_5_CLOSE_DIFF&quot;]' data-full-width='false'></marimo-multiselect></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "hHhF",
+      "code_hash": null,
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "application/json": "[\"EMA_50_DIFF_PCT\", \"EMA_200_DIFF\", \"EMA_200_DIFF_PCT\", \"TREND_DIFF_RATIO_10_50\", \"TREND_DIFF_RATIO_10_200\", \"TREND_DIFF_RATIO_50_200\", \"RSI_14\", \"RSI_28\", \"MACD\", \"MACD_SIGNAL\", \"MACD_HIST\", \"ATR_20\", \"ATR_RATIO\", \"ATR_100\", \"BB_WIDTH\", \"BB_POSITION\", \"VOLUME_MA_20_DIFF\", \"VOLUME_MA_100_DIFF\", \"VOLUME_RATIO\", \"OBV_DIFF\", \"LAG_1_CLOSE_DIFF\", \"LAG_5_CLOSE_DIFF\"]"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "SFPL",
+      "code_hash": "ced33d6e8d0c6b7fc7b5ed1b2faf46ef",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "BYtC",
+      "code_hash": "424720df94646284c53b8d2d5027f8fa",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "RGSE",
+      "code_hash": "1dfb22f17d7ce31c7cf4e48917e91e7a",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "Kclp",
+      "code_hash": "46ff112da112c7a7273ac85b6900b17e",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "emfo",
+      "code_hash": null,
       "outputs": [],
       "console": []
     }

@@ -191,6 +191,16 @@ def _(
 
 
 @app.cell
+def _(states):
+    # 将states向上移动一位，目标是预测未来一期的市场结构
+    # features(t) -> state(t+1)
+    target = states.copy()
+    target.name = "target"
+    target.shift(-1).to_csv("target.csv", index=True)
+    return (target,)
+
+
+@app.cell
 def _():
     return
 
