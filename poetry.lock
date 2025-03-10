@@ -1613,13 +1613,13 @@ source = ["Cython (>=3.0.11,<3.1.0)"]
 
 [[package]]
 name = "marimo"
-version = "0.11.10"
+version = "0.11.17"
 description = "A library for making reactive notebooks and apps"
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "marimo-0.11.10-py3-none-any.whl", hash = "sha256:baa15897c8044b24f00541889225f1f69d97adf9b3b1262d4bc72364e224e593"},
-    {file = "marimo-0.11.10.tar.gz", hash = "sha256:cba355ad69a20bca5d064e5322946d329893e7c10ca870d9e7ce7624d3f5f2b5"},
+    {file = "marimo-0.11.17-py3-none-any.whl", hash = "sha256:15092b0f284ea11a9768cfdd4538922ae13683bb549077e7ba56df7d3d6f6d5d"},
+    {file = "marimo-0.11.17.tar.gz", hash = "sha256:8ca0cd6c18439d0cb368f7b524b5e93596888509add3fd4b22ead3e5600a88d7"},
 ]
 
 [package.dependencies]
