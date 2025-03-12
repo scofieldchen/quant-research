@@ -45,7 +45,7 @@ def _():
 
 @app.cell
 def _(mo):
-    mo.md("## 计算特征")
+    mo.md("""## 计算特征""")
     return
 
 
@@ -602,13 +602,12 @@ def _(df, perform_kruskal_wallis):
             print(f"{col}: p-value({pvalue:.2%}) < {alpha:.1%}, 拒绝原假设，即不同类别下特征的中位数存在显著差异")
         else:
             print(f"{col}: p-value({pvalue:.2%}) > {alpha:.1%}, 接受原假设，即不同类别下特征的中位数没有显著差异")
-        
     return alpha, col, feature_array, pvalue, results, target_array
 
 
 @app.cell
 def _(mo):
-    mo.md("### 3. 特征重要性")
+    mo.md("""### 3. 特征重要性""")
     return
 
 
@@ -684,7 +683,7 @@ def _(
 
 @app.cell
 def _(mo):
-    mo.md("## 保存数据")
+    mo.md("""## 保存数据""")
     return
 
 
