@@ -98,10 +98,7 @@ def _(
 
         return splits
 
-
-    def calculate_metrics(
-        y_true: pd.Series, y_pred: pd.Series
-    ) -> Dict[str, float]:
+    def calculate_metrics(y_true: pd.Series, y_pred: pd.Series) -> Dict[str, float]:
         """
         计算分类模型的评估指标。
 
@@ -113,9 +110,7 @@ def _(
             包含准确率、精确率、召回率和 F1 分数的字典。
         """
         accuracy = accuracy_score(y_true, y_pred)
-        precision = precision_score(
-            y_true, y_pred, average="weighted", zero_division=0
-        )
+        precision = precision_score(y_true, y_pred, average="weighted", zero_division=0)
         recall = recall_score(y_true, y_pred, average="weighted", zero_division=0)
         f1 = f1_score(y_true, y_pred, average="weighted", zero_division=0)
 
@@ -125,7 +120,6 @@ def _(
             "recall": recall,
             "f1_score": f1,
         }
-
 
     def train_and_predict(
         X_train: pd.DataFrame,
@@ -188,7 +182,6 @@ def _(
         results.update(metrics)
 
         return results
-
 
     def walk_forward_validate(
         X: pd.DataFrame,
@@ -276,6 +269,7 @@ def _(
             results.append(res)
 
         return results
+
     return (
         calculate_metrics,
         train_and_predict,
