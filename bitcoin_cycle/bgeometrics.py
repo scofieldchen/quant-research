@@ -11,6 +11,8 @@ METRICS_URL_MAP = {
     "sth_nupl": "https://charts.bgeometrics.com/files/sth_nupl.json",
     "sth_mvrv": "https://charts.bgeometrics.com/files/sth_mvrv.json",
     "miner_sell_presure": "https://charts.bgeometrics.com/files/miner_sell_presure.json",
+    "nrpl": "https://charts.bgeometrics.com/files/nrpl.json",
+    "realized_profit_loss_ratio": "https://charts.bgeometrics.com/files/realized_profit_loss_ratio.json",
 }
 
 
@@ -130,6 +132,12 @@ class BGClient:
     def get_miner_sell_presure(self) -> pd.DataFrame:
         return self.get_metric("miner_sell_presure")
 
+    def get_nrpl(self) -> pd.DataFrame:
+        return self.get_metric("nrpl")
+
+    def get_realized_profit_loss_ratio(self) -> pd.DataFrame:
+        return self.get_metric("realized_profit_loss_ratio")
+
 
 if __name__ == "__main__":
     client = BGClient()
@@ -139,5 +147,7 @@ if __name__ == "__main__":
     print(df.head())
 
     # 使用便捷方法
-    df = client.get_sth_realized_price()
+    # df = client.get_sth_realized_price()
+    # df = client.get_nrpl()
+    df = client.get_realized_profit_loss_ratio()
     print(df.tail())
