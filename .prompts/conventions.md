@@ -1,7 +1,7 @@
 在编写代码时，请严格遵循以下规范：
 
 1. 文件结构要求：
-    - 所有代码文件必须位于 `scripts/` 目录下
+    - 所有代码文件必须位于 `bitcoin_cycle/` 目录下
     - 不要在 `notebooks/` 目录中创建任何文件
 
 2. 类型提示规范：
@@ -23,7 +23,6 @@ def process_data(input_list: List[str], threshold: float = 0.5) -> Dict[str, Any
         - Args（参数说明）
         - Returns（返回值说明）
         - Raises（异常说明，如果有） 
-    - 统一使用英文
 
 示例：
 ```python
