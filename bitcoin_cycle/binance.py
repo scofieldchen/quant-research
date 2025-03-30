@@ -1,8 +1,8 @@
 import datetime as dt
 import io
-import time
 import zipfile
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import pandas as pd
@@ -46,7 +46,7 @@ class HistoricalFutureMetricsDownloader(FutureMetricsDownloader):
 
     BASE_URL = "https://data.binance.vision/data/futures/um/daily/metrics/"
 
-    def __init__(self, data_directory: str) -> None:
+    def __init__(self, data_directory: str):
         self.data_directory = Path(data_directory)
 
         # 创建存储数据的文件夹
@@ -95,12 +95,9 @@ class HistoricalFutureMetricsDownloader(FutureMetricsDownloader):
         except Exception as e:
             raise DataProcessError(str(e))
 
-    def download_daily_metrics(self, symbol: str, date: dt.datetime) -> bool:
-        # 先创建存储交易对数据的子文件夹
-        symbol_data_dir = self.data_directory / symbol
-        if not symbol_data_dir.exists():
-            symbol_data_dir.mkdir()
-
+    def download_daily_metrics(
+        self, symbol_dir: Path, symbol: str, date: dt.datetime
+    ) -> bool:
         # 下载并存储数据
         try:
             resp = self._fetch_daily_metrics(symbol, date)
@@ -112,14 +109,57 @@ class HistoricalFutureMetricsDownloader(FutureMetricsDownloader):
             print(f"Failed to process data of {date} for {symbol}: {str(e)}")
             return False
         else:
-            filepath = symbol_data_dir / f"{date.strftime("%Y%m%d")}.csv"
+            filepath = symbol_dir / f"{date.strftime("%Y%m%d")}.csv"
             df.to_csv(filepath, index=True)
             return True
 
     def download(
-        self, symbol: str, start_date: dt.datetime, end_date: dt.datetime
+        self,
+        symbol: str,
+        start_date: dt.datetime,
+        end_date: dt.datetime,
+        max_workers: int = 3,
     ) -> None:
-        pass
+        """并行下载指定日期范围内的数据
+
+        Args:
+            symbol: 交易对符号，'BTCUSDT'
+            start_date: 开始日期
+            end_date: 结束日期
+            max_workers: 最大线程数
+        """
+        if start_date > end_date:
+            raise ValueError("Start date must be before end date")
+
+        # 创建交易对数据目录
+        symbol_dir = self.data_directory / symbol
+        symbol_dir.mkdir(parents=True, exist_ok=True)
+
+        # 生成日期列表
+        date_range = [
+            start_date + dt.timedelta(days=i)
+            for i in range((end_date - start_date).days + 1)
+        ]
+
+        # 使用线程池并行下载
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # 提交所有下载任务
+            futures = {
+                executor.submit(
+                    self.download_daily_metrics, symbol_dir, symbol, date
+                ): date
+                for date in date_range
+            }
+
+            # 处理完成的任务
+            for future in as_completed(futures):
+                date = futures[future]
+                try:
+                    success = future.result()
+                    if success:
+                        print(f"Downloaded {symbol} data for {date}")
+                except Exception as e:
+                    print(f"Failed to download {symbol} data for {date}: {str(e)}")
 
 
 class APIFutureMetricsDownloader(FutureMetricsDownloader):
@@ -129,8 +169,9 @@ class APIFutureMetricsDownloader(FutureMetricsDownloader):
 
 
 symbol = "BTCUSDT"
-date = dt.datetime(2025, 3, 26)
+start_date = dt.datetime(2025, 3, 1)
+end_date = dt.datetime(2025, 3, 10)
 data_directory = "/users/scofield/quant-research/bitcoin_cycle/data"
 
 historical_metrics_downloader = HistoricalFutureMetricsDownloader(data_directory)
-historical_metrics_downloader.download_daily_metrics(symbol, date)
+historical_metrics_downloader.download(symbol, start_date, end_date)
