@@ -9,11 +9,22 @@ import pandas as pd
 import requests
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
-    RetryError,
 )
+
+
+class DataFetchError(Exception):
+    pass
+
+
+class InvalidRequestError(DataFetchError):
+    pass
+
+
+class NetworkError(DataFetchError):
+    pass
 
 
 class DataProcessError(Exception):
@@ -44,13 +55,8 @@ class HistoricalFutureMetricsDownloader(FutureMetricsDownloader):
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type(
-            (
-                requests.exceptions.ConnectionError,
-                requests.exceptions.Timeout,
-                requests.exceptions.ChunkedEncodingError,
-            )
-        ),
+        retry=retry_if_exception_type(NetworkError),
+        reraise=True,
     )
     def _fetch_daily_metrics(self, symbol: str, date: dt.datetime) -> requests.Response:
         # 构建请求url
@@ -58,9 +64,14 @@ class HistoricalFutureMetricsDownloader(FutureMetricsDownloader):
         filename = f"{symbol}/{symbol}-metrics-{date_str}.zip"
         url = HistoricalFutureMetricsDownloader.BASE_URL + filename
 
-        # 下载数据，如果参数错误直接引发异常，如果网络连接错误则进行重试
-        response = requests.get(url, stream=True, timeout=5)
-        response.raise_for_status()
+        # 下载数据
+        try:
+            response = requests.get(url, stream=True, timeout=5)
+            if response.status_code == 404:
+                raise InvalidRequestError(f"Invalid symbol({symbol}) or date({date})")
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            raise NetworkError(f"Request failed due to network errors: {e}")
 
         return response
 
@@ -84,7 +95,7 @@ class HistoricalFutureMetricsDownloader(FutureMetricsDownloader):
         except Exception as e:
             raise DataProcessError(str(e))
 
-    def download_daily_metrics(self, symbol: str, date: dt.datetime) -> None:
+    def download_daily_metrics(self, symbol: str, date: dt.datetime) -> bool:
         # 先创建存储交易对数据的子文件夹
         symbol_data_dir = self.data_directory / symbol
         if not symbol_data_dir.exists():
@@ -94,19 +105,16 @@ class HistoricalFutureMetricsDownloader(FutureMetricsDownloader):
         try:
             resp = self._fetch_daily_metrics(symbol, date)
             df = self._process_daily_metrics(resp)
-        except requests.exceptions.HTTPError as e:
-            print(
-                f"下载数据失败，参数 symbol({symbol}) 或 date({date:%Y-%m-%d}) 可能无效: {str(e)}"
-            )
-        except RetryError as e:
-            print(
-                f"下载数据失败（多次重试失败），symbol={symbol} date={date:%Y-%m-%d}，检查网络连接"
-            )
+        except DataFetchError as e:
+            print(e)
+            return False
         except DataProcessError as e:
-            print(f"处理数据失败，symbol={symbol} date={date:%Y-%m-%d}: {str(e)}")
+            print(f"Failed to process data of {date} for {symbol}: {str(e)}")
+            return False
         else:
             filepath = symbol_data_dir / f"{date.strftime("%Y%m%d")}.csv"
             df.to_csv(filepath, index=True)
+            return True
 
     def download(
         self, symbol: str, start_date: dt.datetime, end_date: dt.datetime
