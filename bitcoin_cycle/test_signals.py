@@ -10,19 +10,21 @@ def read_metrics(filepath_ohlcv: str, filepath_metric: str) -> pd.DataFrame:
 
     return (
         pd.concat([ohlcv["close"], metric], axis=1, join="outer")
-        .rename(columns={"close": "price"})
+        .rename(columns={"close": "btcusd"})
         .dropna()
     )
 
 
+# 读取数据
 filepath_ohlcv = "./data/btcusd.csv"
 filepath_metric = "./data/sth_realized_price.csv"
 df = read_metrics(filepath_ohlcv, filepath_metric)
-print(df.head())
-print(df.tail())
+# print(df.head())
+# print(df.tail())
 
+# 计算信号
 metric = signals.STHRealizedPrice(
-    data=df["sth_realized_price"], btc_prices=df["price"], period=200
+    df, price_col="btcusd", sth_rp_col="sth_realized_price", period=200, threshold=2
 )
 metric.generate_signals()
 print(metric.signals)
