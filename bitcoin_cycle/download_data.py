@@ -43,9 +43,7 @@ def download_blockchain_metrics(data_directory: Path) -> None:
         "sth_sopr",
         "sth_nupl",
         "sth_mvrv",
-        "miner_sell_presure",
         "nrpl",
-        "realized_profit_loss_ratio",
     ]
 
     client = BGClient()
