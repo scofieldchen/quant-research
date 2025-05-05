@@ -227,3 +227,24 @@ class STHRealizedPrice(Metric):
         )
 
         return fig
+
+
+def get_signal_sth_sopr(
+    metrics: pd.Series,
+    bband_period: int = 200,
+    bband_upper_std: float = 2.0,
+    bband_lower_std: float = 1.5,
+) -> pd.DataFrame:
+    bband_upper, _, bband_lower = talib.BBANDS(
+        metrics, bband_period, bband_upper_std, bband_lower_std
+    )
+
+    df = pd.concat([metrics, bband_upper, bband_lower], axis=1)
+    df.columns = ["sth_sopr", "upper_band", "lower_band"]
+    df.dropna(inplace=True)
+
+    signal = np.where(df["sth_sopr"] > df["upper_band"], "peak", "neutral")
+    signal = np.where(df["sth_sopr"] < df["lower_band"], "valley", signal)
+    df["signal"] = signal
+
+    return df
