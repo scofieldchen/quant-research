@@ -19,14 +19,14 @@ def read_metrics(filepath_ohlcv: str, filepath_metric: str) -> pd.DataFrame:
 
 # 读取数据
 filepath_ohlcv = "./data/btcusd.csv"
-filepath_metric = "./data/sth_realized_price.csv"
+filepath_metric = "./data/sth_sopr.csv"
 df = read_metrics(filepath_ohlcv, filepath_metric)
 print(df.head())
 print(df.tail())
 
 # 计算信号
-metric = signals.STHRealizedPrice(df)
-# metric = signals.STHSOPR(df)
+# metric = signals.STHRealizedPrice(df)
+metric = signals.STHSOPR(df)
 # metric = signals.STHNUPL(df)
 # metric = signals.STHMVRV(df)
 # metric = signals.NRPL(df)
