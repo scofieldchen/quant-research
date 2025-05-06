@@ -81,6 +81,33 @@ def _(List, mo, pd, read_metrics, signals):
                 "bband_lower_std": mo.ui.number(value=1.5),
             },
         },
+        "sth_nupl": {
+            "filepath": "./data/sth_nupl.csv",
+            "class": signals.STHNUPL,
+            "params": {
+                "smooth_period": mo.ui.number(value=10),
+                "fisher_period": mo.ui.number(value=200),
+                "threshold": mo.ui.number(value=2.0),
+            },
+        },
+        "sth_mvrv": {
+            "filepath": "./data/sth_mvrv.csv",
+            "class": signals.STHMVRV,
+            "params": {
+                "smooth_period": mo.ui.number(value=10),
+                "fisher_period": mo.ui.number(value=200),
+                "threshold": mo.ui.number(value=2.0),
+            },
+        },
+        "nrpl": {
+            "filepath": "./data/nrpl.csv",
+            "class": signals.NRPL,
+            "params": {
+                "bband_period": mo.ui.number(value=200),
+                "bband_upper_std": mo.ui.number(value=2.0),
+                "bband_lower_std": mo.ui.number(value=2.0),
+            },
+        },
     }
 
     # 读取数据，计算指标信号
@@ -117,7 +144,8 @@ def _(List, mo, pd, read_metrics, signals):
 def _(dt, mo):
     # 日期控件
     start_date_ui = mo.ui.date(
-        label="开始日期", value=(dt.datetime.today() - dt.timedelta(days=7)).date()
+        label="开始日期",
+        value=(dt.datetime.today() - dt.timedelta(days=10)).date(),
     )
     end_date_ui = mo.ui.date(label="结束日期", value=dt.datetime.today().date())
     return end_date_ui, start_date_ui
@@ -146,69 +174,57 @@ def _(mo):
 
 
 @app.cell
-def _(metric_config, mo):
-    # UI
-    metric_selection_ui = mo.ui.dropdown(
-        list(metric_config.keys()), value="sth_realized_price"
-    )
-    metric_selection_ui
-    return (metric_selection_ui,)
+def _():
+    # # UI
+    # metric_selection_ui = mo.ui.dropdown(
+    #     list(metric_config.keys()), value="sth_realized_price"
+    # )
+    # metric_selection_ui
+    return
 
 
 @app.cell
-def _(metric_config, metric_selection_ui, mo):
-    metric_params_ui = []
-    metric_params = metric_config[metric_selection_ui.value]["params"]
+def _():
+    # metric_params_ui = []
+    # metric_params = metric_config[metric_selection_ui.value]["params"]
 
-    for k, v in metric_params.items():
-        metric_params_ui.append(mo.md(k))
-        metric_params_ui.append(v)
+    # for k, v in metric_params.items():
+    #     metric_params_ui.append(mo.md(k))
+    #     metric_params_ui.append(v)
 
-    mo.vstack(metric_params_ui)
-    return k, metric_params, metric_params_ui, v
-
-
-@app.cell
-def _(metric_params):
-    selected_params = {k: v.value for k, v in metric_params.items()}
-    print(selected_params)
-    return (selected_params,)
+    # mo.vstack(metric_params_ui)
+    return
 
 
 @app.cell
-def _(
-    btcusd_filepath,
-    metric_config,
-    metric_selection_ui,
-    read_metrics,
-    selected_params,
-):
-    selected_metric_name = metric_selection_ui.value
-    print(selected_metric_name)
+def _():
+    # selected_params = {k: v.value for k, v in metric_params.items()}
+    # print(selected_params)
+    return
 
-    selected_metric_config = metric_config[selected_metric_name]
-    print(selected_metric_config)
 
-    selected_metric_data = read_metrics(
-        btcusd_filepath, selected_metric_config["filepath"]
-    )
-    print(selected_metric_data.tail())
+@app.cell
+def _():
+    # selected_metric_name = metric_selection_ui.value
+    # print(selected_metric_name)
 
-    selected_metric = selected_metric_config["class"](
-        selected_metric_data, **selected_params
-    )
-    selected_metric.generate_signals()
-    print(selected_metric.signals.tail())
+    # selected_metric_config = metric_config[selected_metric_name]
+    # print(selected_metric_config)
 
-    fig = selected_metric.generate_chart()
-    fig
-    return (
-        fig,
-        selected_metric,
-        selected_metric_config,
-        selected_metric_data,
-        selected_metric_name,
-    )
+    # selected_metric_data = read_metrics(
+    #     btcusd_filepath, selected_metric_config["filepath"]
+    # )
+    # print(selected_metric_data.tail())
+
+    # selected_metric = selected_metric_config["class"](
+    #     selected_metric_data, **selected_params
+    # )
+    # selected_metric.generate_signals()
+    # print(selected_metric.signals.tail())
+
+    # fig = selected_metric.generate_chart()
+    # fig
+    return
 
 
 @app.cell

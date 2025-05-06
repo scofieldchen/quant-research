@@ -506,11 +506,11 @@ class NRPL(Metric):
 
     @property
     def name(self) -> str:
-        return "Net Realized Profit/Loss Ratio"
+        return "Net Realized Profit Loss"
 
     @property
     def description(self) -> str:
-        return "使用布林带分析净实现盈亏比率(NRPL)，识别潜在的市场顶部和底部。"
+        return "使用布林带分析净实现盈亏(NRPL)，识别潜在的市场顶部和底部。"
 
     def __init__(
         self,
