@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import Any, List, Type
 
 import numpy as np
@@ -8,16 +7,6 @@ import plotly.graph_objects as go
 import talib
 from plotly.subplots import make_subplots
 from utils import find_trend_periods, fisher_transform
-
-
-@dataclass
-class ParameterInfo:
-    """存储指标参数的元数据"""
-
-    name: str
-    description: str
-    type: Type
-    default: Any
 
 
 class Metric(ABC):
@@ -41,12 +30,6 @@ class Metric(ABC):
         """指标的简短描述"""
         pass
 
-    @property
-    @abstractmethod
-    def parameters_info(self) -> List[ParameterInfo]:
-        """定义指标参数"""
-        pass
-
     @abstractmethod
     def _validate_data(self) -> None:
         """验证输入数据是否有效，由子类实现"""
@@ -68,7 +51,7 @@ class STHRealizedPrice(Metric):
 
     @property
     def name(self) -> str:
-        return "Short-Term Holder Realized Price Oscillator"
+        return "Short-Term Holder Realized Price"
 
     @property
     def description(self) -> str:
@@ -76,35 +59,6 @@ class STHRealizedPrice(Metric):
             "比较比特币价格与其短期持有者实现价格，以识别潜在的市场顶部和底部。",
             "使用 Fisher 变换对价格差异进行归一化处理。",
         )
-
-    @property
-    def parameters_info(self) -> List[ParameterInfo]:
-        return [
-            ParameterInfo(
-                name="price_col",
-                description="Column name for Bitcoin price.",
-                type=str,
-                default="btcusd",
-            ),
-            ParameterInfo(
-                name="sth_rp_col",
-                description="Column name for STH Realized Price data.",
-                type=str,
-                default="sth_realized_price",
-            ),
-            ParameterInfo(
-                name="period",
-                description="Lookback period for the Fisher Transform.",
-                type=int,
-                default=200,
-            ),
-            ParameterInfo(
-                name="threshold",
-                description="Threshold for Fisher Transform to trigger peak/valley signals.",
-                type=float,
-                default=2.0,
-            ),
-        ]
 
     def __init__(
         self,
@@ -229,22 +183,162 @@ class STHRealizedPrice(Metric):
         return fig
 
 
-def get_signal_sth_sopr(
-    metrics: pd.Series,
-    bband_period: int = 200,
-    bband_upper_std: float = 2.0,
-    bband_lower_std: float = 1.5,
-) -> pd.DataFrame:
-    bband_upper, _, bband_lower = talib.BBANDS(
-        metrics, bband_period, bband_upper_std, bband_lower_std
-    )
+class STHSOPR(Metric):
+    """短期持有者支出产出比率(STH-SOPR)指标"""
 
-    df = pd.concat([metrics, bband_upper, bband_lower], axis=1)
-    df.columns = ["sth_sopr", "upper_band", "lower_band"]
-    df.dropna(inplace=True)
+    @property
+    def name(self) -> str:
+        return "Short-Term Holder SOPR"
 
-    signal = np.where(df["sth_sopr"] > df["upper_band"], "peak", "neutral")
-    signal = np.where(df["sth_sopr"] < df["lower_band"], "valley", signal)
-    df["signal"] = signal
+    @property
+    def description(self) -> str:
+        return (
+            "使用布林带分析短期持有者支出产出比率(STH-SOPR)，识别潜在的市场顶部和底部。"
+        )
 
-    return df
+    def __init__(
+        self,
+        data: pd.DataFrame,
+        price_col: str = "btcusd",
+        sopr_col: str = "sth_sopr",
+        bband_period: int = 200,
+        bband_upper_std: float = 2.0,
+        bband_lower_std: float = 1.5,
+    ) -> None:
+        """
+        初始化 STHSOPR 指标类
+
+        Args:
+            data: 包含 STH-SOPR 数据的 DataFrame
+            price_col: DataFrame 中表示比特币价格列的名称
+            sopr_col: DataFrame 中 STH-SOPR 列的名称
+            bband_period: 布林带计算周期
+            bband_upper_std: 上轨标准差乘数
+            bband_lower_std: 下轨标准差乘数
+        """
+        self.price_col = price_col
+        self.sopr_col = sopr_col
+        self.bband_period = bband_period
+        self.bband_upper_std = bband_upper_std
+        self.bband_lower_std = bband_lower_std
+        super().__init__(data)
+
+    def _validate_data(self) -> None:
+        for col in [self.price_col, self.sopr_col]:
+            if col not in self.data.columns:
+                raise ValueError(f"Input dataframe is missing required column: {col}")
+
+    def generate_signals(self) -> None:
+        self.signals = self.data.copy()
+
+        # 计算布林带
+        bband_upper, _, bband_lower = talib.BBANDS(
+            self.signals[self.sopr_col],
+            self.bband_period,
+            self.bband_upper_std,
+            self.bband_lower_std,
+        )
+
+        self.signals["upper_band"] = bband_upper
+        self.signals["lower_band"] = bband_lower
+
+        # 生成信号
+        signals = np.where(self.signals[self.sopr_col] > bband_upper, 1, 0)
+        signals = np.where(self.signals[self.sopr_col] < bband_lower, -1, signals)
+        self.signals["signal"] = signals
+
+    def generate_chart(self) -> go.Figure:
+        if self.signals is None:
+            self.generate_signals()
+
+        # 创建图表
+        fig = make_subplots(
+            rows=2,
+            cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.05,
+            subplot_titles=(
+                "<b>Bitcoin price</b>",
+                "<b>STH-SOPR with Bollinger Bands</b>",
+            ),
+            row_heights=[0.7, 0.3],
+        )
+
+        # 添加比特币价格曲线
+        fig.add_trace(
+            go.Scatter(x=self.signals.index, y=self.signals[self.price_col]),
+            row=1,
+            col=1,
+        )
+
+        # 添加 SOPR 曲线
+        fig.add_trace(
+            go.Scatter(
+                x=self.signals.index,
+                y=self.signals[self.sopr_col],
+                name="STH-SOPR",
+                line=dict(color="#1f77b4"),
+            ),
+            row=2,
+            col=1,
+        )
+
+        # 添加布林带
+        fig.add_trace(
+            go.Scatter(
+                x=self.signals.index,
+                y=self.signals["upper_band"],
+                name="Upper Band",
+                line=dict(color="gray", dash="dash"),
+            ),
+            row=2,
+            col=1,
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=self.signals.index,
+                y=self.signals["lower_band"],
+                name="Lower Band",
+                line=dict(color="gray", dash="dash"),
+            ),
+            row=2,
+            col=1,
+        )
+
+        # 添加极值区域背景
+        peak_periods = find_trend_periods(self.signals["signal"] == 1)
+        valley_periods = find_trend_periods(self.signals["signal"] == -1)
+
+        for x0, x1 in peak_periods:
+            fig.add_vrect(
+                x0=x0,
+                x1=x1,
+                fillcolor="#FF6B6B",
+                opacity=0.2,
+                line_width=0,
+                row=1,
+                col=1,
+            )
+
+        for x0, x1 in valley_periods:
+            fig.add_vrect(
+                x0=x0,
+                x1=x1,
+                fillcolor="#38A169",
+                opacity=0.2,
+                line_width=0,
+                row=1,
+                col=1,
+            )
+
+        # 更新图表
+        fig.update_layout(
+            title=f"</b>{self.name}</b>",
+            width=1000,
+            height=700,
+            template="plotly_white",
+            showlegend=False,
+        )
+
+        return fig

@@ -12,13 +12,16 @@ def _():
 
 @app.cell
 def _():
+    from typing import List
+    import datetime as dt
+
     import numpy as np
     import pandas as pd
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
 
     import signals
-    return go, make_subplots, np, pd, signals
+    return List, dt, go, make_subplots, np, pd, signals
 
 
 @app.cell
@@ -38,38 +41,102 @@ def _(pd):
         return (
             pd.concat([ohlcv["close"], metric], axis=1, join="outer")
             .rename(columns={"close": "btcusd"})
+            .ffill()
             .dropna()
         )
-    return (read_metrics,)
+
+
+    def color_signal(value: str) -> str:
+        if value == "peak":
+            color = "red"
+        elif value == "valley":
+            color = "green"
+        else:
+            color = ""
+        return f"color: {color}"
+    return color_signal, read_metrics
 
 
 @app.cell
-def _(read_metrics):
-    ## sth realized price
-    filepath_ohlcv = "./data/btcusd.csv"
-    filepath_metric = "./data/sth_realized_price.csv"
-    df = read_metrics(filepath_ohlcv, filepath_metric)
-    df
-    return df, filepath_metric, filepath_ohlcv
+def _(List, mo, pd, read_metrics, signals):
+    # 参数
+    btcusd_filepath = "./data/btcusd.csv"
+
+    # 指标配置，存储在字典中，指标名称 -> 数据文件路径，信号类
+    metric_config = {
+        "sth_realized_price": {
+            "filepath": "./data/sth_realized_price.csv",
+            "class": signals.STHRealizedPrice,
+            "params": {
+                "period": mo.ui.number(value=200),
+                "threshold": mo.ui.number(value=2.0),
+            },
+        },
+        "sth_sopr": {
+            "filepath": "./data/sth_sopr.csv",
+            "class": signals.STHSOPR,
+            "params": {
+                "bband_period": mo.ui.number(value=200),
+                "bband_upper_std": mo.ui.number(value=2.0),
+                "bband_lower_std": mo.ui.number(value=1.5),
+            },
+        },
+    }
+
+    # 读取数据，计算指标信号
+    all_metrics: List[signals.Metric] = []
+
+    for name, config in metric_config.items():
+        data = read_metrics(btcusd_filepath, config["filepath"])
+        metric_cls = config["class"](data)
+        metric_cls.generate_signals()
+        all_metrics.append(metric_cls)
 
 
-@app.cell
-def _(df, signals):
-    metric = signals.STHRealizedPrice(
-        df,
-        price_col="btcusd",
-        sth_rp_col="sth_realized_price",
-        period=200,
-        threshold=2,
+    signals_df = (
+        pd.concat({m.name: m.signals["signal"] for m in all_metrics}, axis=1)
+        .ffill()
+        .dropna()
+        .astype(int)
+        .replace({0: "neutral", 1: "peak", -1: "valley"})
     )
-    metric.generate_signals()
-    return (metric,)
+    signals_df
+    return (
+        all_metrics,
+        btcusd_filepath,
+        config,
+        data,
+        metric_cls,
+        metric_config,
+        name,
+        signals_df,
+    )
 
 
 @app.cell
-def _(metric):
-    metric.signals
-    return
+def _(dt, mo):
+    # 日期控件
+    start_date_ui = mo.ui.date(
+        label="开始日期", value=(dt.datetime.today() - dt.timedelta(days=7)).date()
+    )
+    end_date_ui = mo.ui.date(label="结束日期", value=dt.datetime.today().date())
+    return end_date_ui, start_date_ui
+
+
+@app.cell
+def _(color_signal, end_date_ui, mo, pd, signals_df, start_date_ui):
+    # 读取UI控件的值
+    start_date_val = pd.Timestamp(start_date_ui.value)
+    end_date_val = pd.Timestamp(end_date_ui.value)
+
+    # 更新数据展示
+    dashboard = signals_df.loc[start_date_val:end_date_val].T
+    dashboard.columns = [col.strftime("%m.%d") for col in dashboard.columns]
+    styled_dashboard = dashboard.style.map(color_signal)
+
+    # 展示控件和结果
+    mo.vstack([start_date_ui, end_date_ui, mo.md(styled_dashboard.to_html())])
+    return dashboard, end_date_val, start_date_val, styled_dashboard
 
 
 @app.cell
@@ -79,33 +146,69 @@ def _(mo):
 
 
 @app.cell
-def _(mo):
+def _(metric_config, mo):
     # UI
-    period_ui = mo.ui.slider(
-        start=100, stop=500, value=200, step=10, label="Lookback period"
+    metric_selection_ui = mo.ui.dropdown(
+        list(metric_config.keys()), value="sth_realized_price"
     )
-    threshold_ui = mo.ui.slider(
-        start=1.0, stop=3.0, value=2.0, step=0.1, label="Threshold"
-    )
-    return period_ui, threshold_ui
+    metric_selection_ui
+    return (metric_selection_ui,)
 
 
 @app.cell
-def _(df, metric, mo, period_ui, signals, threshold_ui):
-    # 数据可视化
-    selected_metric = signals.STHRealizedPrice(
-        df,
-        price_col="btcusd",
-        sth_rp_col="sth_realized_price",
-        period=period_ui.value,
-        threshold=threshold_ui.value,
+def _(metric_config, metric_selection_ui, mo):
+    metric_params_ui = []
+    metric_params = metric_config[metric_selection_ui.value]["params"]
+
+    for k, v in metric_params.items():
+        metric_params_ui.append(mo.md(k))
+        metric_params_ui.append(v)
+
+    mo.vstack(metric_params_ui)
+    return k, metric_params, metric_params_ui, v
+
+
+@app.cell
+def _(metric_params):
+    selected_params = {k: v.value for k, v in metric_params.items()}
+    print(selected_params)
+    return (selected_params,)
+
+
+@app.cell
+def _(
+    btcusd_filepath,
+    metric_config,
+    metric_selection_ui,
+    read_metrics,
+    selected_params,
+):
+    selected_metric_name = metric_selection_ui.value
+    print(selected_metric_name)
+
+    selected_metric_config = metric_config[selected_metric_name]
+    print(selected_metric_config)
+
+    selected_metric_data = read_metrics(
+        btcusd_filepath, selected_metric_config["filepath"]
+    )
+    print(selected_metric_data.tail())
+
+    selected_metric = selected_metric_config["class"](
+        selected_metric_data, **selected_params
     )
     selected_metric.generate_signals()
-    fig = metric.generate_chart()
+    print(selected_metric.signals.tail())
 
-    # 显示结果
-    mo.vstack([period_ui, threshold_ui, fig])
-    return fig, selected_metric
+    fig = selected_metric.generate_chart()
+    fig
+    return (
+        fig,
+        selected_metric,
+        selected_metric_config,
+        selected_metric_data,
+        selected_metric_name,
+    )
 
 
 @app.cell
