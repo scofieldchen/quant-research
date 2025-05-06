@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, List, Type
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
@@ -12,9 +13,10 @@ from utils import find_trend_periods, fisher_transform
 class Metric(ABC):
     """代表指标的抽象基类"""
 
-    def __init__(self, data: pd.DataFrame, **kwargs: Any) -> None:
+    def __init__(self, data: pd.DataFrame, chart_rows: int = 2, **kwargs: Any) -> None:
         """初始化指标"""
         self.data = data
+        self.chart_rows = chart_rows
         self._validate_data()
         self.signals: pd.DataFrame | None = None
 
@@ -40,10 +42,81 @@ class Metric(ABC):
         """计算交易信号，由子类实现"""
         pass
 
+    def _create_base_figure(self) -> go.Figure:
+        """创建基础分层图表"""
+        return make_subplots(
+            rows=self.chart_rows,
+            cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.05,
+        )
+
+    def _add_price_trace(self, fig: go.Figure) -> None:
+        """添加比特币价格曲线"""
+        fig.add_trace(
+            go.Scatter(
+                x=self.signals.index,
+                y=self.signals[self.price_col],
+                name="Bitcoin Price",
+            ),
+            row=1,
+            col=1,
+        )
+
+    def _add_signal_backgrounds(self, fig: go.Figure) -> None:
+        """添加信号背景区域"""
+        peak_periods = find_trend_periods(self.signals["signal"] == 1)
+        valley_periods = find_trend_periods(self.signals["signal"] == -1)
+
+        for x0, x1 in peak_periods:
+            fig.add_vrect(
+                x0=x0,
+                x1=x1,
+                fillcolor="#FF6B6B",
+                opacity=0.2,
+                line_width=0,
+                row=1,
+                col=1,
+            )
+
+        for x0, x1 in valley_periods:
+            fig.add_vrect(
+                x0=x0,
+                x1=x1,
+                fillcolor="#38A169",
+                opacity=0.2,
+                line_width=0,
+                row=1,
+                col=1,
+            )
+
+    def _update_layout(self, fig: go.Figure) -> None:
+        """更新图表布局"""
+        fig.update_layout(
+            title=self.name,
+            width=1000,
+            height=700,
+            template="plotly_white",
+            showlegend=True,
+        )
+
     @abstractmethod
-    def generate_chart(self) -> go.Figure:
-        """数据可视化，由子类实现"""
+    def _add_indicator_traces(self, fig: go.Figure) -> None:
+        """添加指标相关曲线，由子类实现"""
         pass
+
+    def generate_chart(self) -> go.Figure:
+        """生成完整的图表"""
+        if self.signals is None:
+            self.generate_signals()
+
+        fig = self._create_base_figure()
+        self._add_price_trace(fig)
+        self._add_indicator_traces(fig)
+        self._add_signal_backgrounds(fig)
+        self._update_layout(fig)
+
+        return fig
 
 
 class STHRealizedPrice(Metric):
@@ -82,7 +155,7 @@ class STHRealizedPrice(Metric):
         self.sth_rp_col = sth_rp_col
         self.period = period
         self.threshold = threshold
-        super().__init__(data)
+        super().__init__(data, chart_rows=2)
 
     def _validate_data(self) -> None:
         for col in [self.price_col, self.sth_rp_col]:
@@ -98,69 +171,21 @@ class STHRealizedPrice(Metric):
         self.signals["normalized_diff"] = normalized_diff
         self.signals["signal"] = signals
 
-    def generate_chart(self) -> go.Figure:
-        if self.signals is None:
-            self.generate_signals()
-
-        # 创建图表
-        fig = make_subplots(
-            rows=2,
-            cols=1,
-            shared_xaxes=True,
-            vertical_spacing=0.05,
-            subplot_titles=(
-                "<b>Bitcoin price vs STH Realized price</b>",
-                "<b>Normalized price diff</b>",
-            ),
-            row_heights=[0.7, 0.3],
-        )
-
-        # 添加价格曲线
-        fig.add_trace(
-            go.Scatter(x=self.signals.index, y=self.signals[self.price_col]),
-            row=1,
-            col=1,
-        )
-
-        # 添加指标曲线
+    def _add_indicator_traces(self, fig: go.Figure) -> None:
+        # 在第一行（价格图表）添加原始指标
         fig.add_trace(
             go.Scatter(x=self.signals.index, y=self.signals[self.sth_rp_col]),
             row=1,
             col=1,
         )
 
-        # 添加极值区域背景
-        peak_periods = find_trend_periods(self.signals["signal"] == 1)
-        valley_periods = find_trend_periods(self.signals["signal"] == -1)
-
-        for x0, x1 in peak_periods:
-            fig.add_vrect(
-                x0=x0,
-                x1=x1,
-                fillcolor="#FF6B6B",
-                opacity=0.2,
-                line_width=0,
-                row=1,
-                col=1,
-            )
-
-        for x0, x1 in valley_periods:
-            fig.add_vrect(
-                x0=x0,
-                x1=x1,
-                fillcolor="#38A169",
-                opacity=0.2,
-                line_width=0,
-                row=1,
-                col=1,
-            )
-
-        # 添加标准化指标
+        # 第二行添加标准化指标
         fig.add_trace(
             go.Scatter(x=self.signals.index, y=self.signals["normalized_diff"]),
             row=2,
             col=1,
         )
+
         for level in [-self.threshold, self.threshold]:
             fig.add_hline(
                 y=level,
@@ -170,17 +195,6 @@ class STHRealizedPrice(Metric):
                 line_color="grey",
                 line_width=0.8,
             )
-
-        # 更新图表
-        fig.update_layout(
-            title=f"</b>{self.name}</b>",
-            width=1000,
-            height=700,
-            template="plotly_white",
-            showlegend=False,
-        )
-
-        return fig
 
 
 class STHSOPR(Metric):
