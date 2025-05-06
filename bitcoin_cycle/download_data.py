@@ -33,7 +33,9 @@ def download_ohlcv(data_directory: Path) -> None:
     filepath = data_directory / f"{ticker.replace("-", "").lower()}.csv"
     data.to_csv(filepath, index=True)
 
-    console.print(f"✅ Downloaded {ticker}", style="green bold")
+    console.print(
+        f"✅ Downloaded {ticker}, last:{data.index.max():%Y-%m-%d}", style="green bold"
+    )
 
 
 def download_blockchain_metrics(data_directory: Path) -> None:
@@ -53,7 +55,10 @@ def download_blockchain_metrics(data_directory: Path) -> None:
     for metric in metrics:
         try:
             df = client.get_metric(metric)
-            console.print(f"✅ Downloaded {metric}", style="green bold")
+            console.print(
+                f"✅ Downloaded {metric}, last:{df.index.max():%Y-%m-%d}",
+                style="green bold",
+            )
         except Exception as e:
             console.print(f"❌ Failed to fet {metric}: {str(e)}", style="red bold")
         else:
