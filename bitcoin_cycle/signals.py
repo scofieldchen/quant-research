@@ -563,37 +563,13 @@ class NRPL(Metric):
         signals = np.where(self.signals[self.nrpl_col] < bband_lower, -1, signals)
         self.signals["signal"] = signals
 
-    def generate_chart(self) -> go.Figure:
-        if self.signals is None:
-            self.generate_signals()
-
-        # 创建图表
-        fig = make_subplots(
-            rows=2,
-            cols=1,
-            shared_xaxes=True,
-            vertical_spacing=0.05,
-            subplot_titles=(
-                "<b>Bitcoin price</b>",
-                "<b>NRPL with Bollinger Bands</b>",
-            ),
-            row_heights=[0.7, 0.3],
-        )
-
-        # 添加比特币价格曲线
-        fig.add_trace(
-            go.Scatter(x=self.signals.index, y=self.signals[self.price_col]),
-            row=1,
-            col=1,
-        )
-
+    def _add_indicator_traces(self, fig: go.Figure) -> None:
         # 添加 NRPL 曲线
         fig.add_trace(
             go.Scatter(
                 x=self.signals.index,
                 y=self.signals[self.nrpl_col],
                 name="NRPL",
-                line=dict(color="#1f77b4"),
             ),
             row=2,
             col=1,
@@ -604,7 +580,6 @@ class NRPL(Metric):
             go.Scatter(
                 x=self.signals.index,
                 y=self.signals["upper_band"],
-                name="Upper Band",
                 line=dict(color="gray", dash="dash"),
             ),
             row=2,
@@ -615,46 +590,8 @@ class NRPL(Metric):
             go.Scatter(
                 x=self.signals.index,
                 y=self.signals["lower_band"],
-                name="Lower Band",
                 line=dict(color="gray", dash="dash"),
             ),
             row=2,
             col=1,
         )
-
-        # 添加极值区域背景
-        peak_periods = find_trend_periods(self.signals["signal"] == 1)
-        valley_periods = find_trend_periods(self.signals["signal"] == -1)
-
-        for x0, x1 in peak_periods:
-            fig.add_vrect(
-                x0=x0,
-                x1=x1,
-                fillcolor="#FF6B6B",
-                opacity=0.2,
-                line_width=0,
-                row=1,
-                col=1,
-            )
-
-        for x0, x1 in valley_periods:
-            fig.add_vrect(
-                x0=x0,
-                x1=x1,
-                fillcolor="#38A169",
-                opacity=0.2,
-                line_width=0,
-                row=1,
-                col=1,
-            )
-
-        # 更新图表
-        fig.update_layout(
-            title=f"</b>{self.name}</b>",
-            width=1000,
-            height=700,
-            template="plotly_white",
-            showlegend=False,
-        )
-
-        return fig
