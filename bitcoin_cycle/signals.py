@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, List, Type
-from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -93,11 +92,38 @@ class Metric(ABC):
     def _update_layout(self, fig: go.Figure) -> None:
         """更新图表布局"""
         fig.update_layout(
-            title=self.name,
+            title=f"<b>{self.name}</b>",
             width=1000,
             height=700,
             template="plotly_white",
             showlegend=True,
+            legend=dict(
+                orientation="h",  # 图例水平排列
+                yanchor="bottom",  # 图例垂直对其方式
+                y=1.02,  # 将图例放置在图表上方
+                x=0.5,  # 将图例放置在图表中间
+                xanchor="center",  # 图例水平对其方式
+            ),
+            xaxis=dict(
+                rangeselector=dict(
+                    buttons=list(
+                        [
+                            dict(
+                                count=3, label="3m", step="month", stepmode="backward"
+                            ),
+                            dict(
+                                count=6, label="6m", step="month", stepmode="backward"
+                            ),
+                            dict(count=1, label="1y", step="year", stepmode="backward"),
+                            dict(count=2, label="2y", step="year", stepmode="backward"),
+                            dict(count=5, label="5y", step="year", stepmode="backward"),
+                            dict(step="all"),
+                        ]
+                    )
+                ),
+                rangeslider=dict(visible=False),
+                type="date",
+            ),
         )
 
     @abstractmethod
@@ -174,14 +200,22 @@ class STHRealizedPrice(Metric):
     def _add_indicator_traces(self, fig: go.Figure) -> None:
         # 在第一行（价格图表）添加原始指标
         fig.add_trace(
-            go.Scatter(x=self.signals.index, y=self.signals[self.sth_rp_col]),
+            go.Scatter(
+                x=self.signals.index,
+                y=self.signals[self.sth_rp_col],
+                name="STH Realized Price",
+            ),
             row=1,
             col=1,
         )
 
         # 第二行添加标准化指标
         fig.add_trace(
-            go.Scatter(x=self.signals.index, y=self.signals["normalized_diff"]),
+            go.Scatter(
+                x=self.signals.index,
+                y=self.signals["normalized_diff"],
+                name="Normalized Price Diff",
+            ),
             row=2,
             col=1,
         )
