@@ -174,57 +174,65 @@ def _(mo):
 
 
 @app.cell
-def _():
-    # # UI
-    # metric_selection_ui = mo.ui.dropdown(
-    #     list(metric_config.keys()), value="sth_realized_price"
-    # )
-    # metric_selection_ui
-    return
+def _(metric_config, mo):
+    # 用户从下拉框中选择指标
+    metric_ids = list(metric_config.keys())
+    metric_dropdown_ui = mo.ui.dropdown(metric_ids)
+
+    # 点击按钮 -> 更新输出
+    btn = mo.ui.run_button(label="更新图表", kind="success")
+    return btn, metric_dropdown_ui, metric_ids
 
 
 @app.cell
-def _():
-    # metric_params_ui = []
-    # metric_params = metric_config[metric_selection_ui.value]["params"]
+def _(
+    btcusd_filepath,
+    btn,
+    metric_config,
+    metric_dropdown_ui,
+    mo,
+    read_metrics,
+):
+    # 获取指标
+    selected_metric = metric_dropdown_ui.value
 
-    # for k, v in metric_params.items():
-    #     metric_params_ui.append(mo.md(k))
-    #     metric_params_ui.append(v)
+    # 使用列表存储参数控件，若用户未选择指标，则列表为空并不显示参数控件
+    metric_params_ui = []
 
-    # mo.vstack(metric_params_ui)
-    return
+    # 最终输出，将图表存储在列表中
+    final_output = []
 
+    # 动态渲染参数控件
+    if selected_metric:
+        metric_params_ui = list(metric_config[selected_metric]["params"].values())
 
-@app.cell
-def _():
-    # selected_params = {k: v.value for k, v in metric_params.items()}
-    # print(selected_params)
-    return
+    # 处理按钮逻辑
+    if btn.value and selected_metric:
+        selected_config = metric_config[selected_metric]
+        args = {k: v.value for k, v in selected_config["params"].items()}
+        selected_data = read_metrics(btcusd_filepath, selected_config["filepath"])
+        selected_metric_ins = selected_config["class"](selected_data, **args)
+        selected_metric_ins.generate_signals()
+        chart = selected_metric_ins.generate_chart()
 
+        # 更新最终输出
+        final_output.append(mo.md(f"选择指标: {selected_metric}"))
+        final_output.append(chart)
 
-@app.cell
-def _():
-    # selected_metric_name = metric_selection_ui.value
-    # print(selected_metric_name)
-
-    # selected_metric_config = metric_config[selected_metric_name]
-    # print(selected_metric_config)
-
-    # selected_metric_data = read_metrics(
-    #     btcusd_filepath, selected_metric_config["filepath"]
-    # )
-    # print(selected_metric_data.tail())
-
-    # selected_metric = selected_metric_config["class"](
-    #     selected_metric_data, **selected_params
-    # )
-    # selected_metric.generate_signals()
-    # print(selected_metric.signals.tail())
-
-    # fig = selected_metric.generate_chart()
-    # fig
-    return
+    # 渲染所有参数控件和最终输出
+    mo.vstack(
+        [metric_dropdown_ui, *metric_params_ui, btn, mo.md("---"), *final_output]
+    )
+    return (
+        args,
+        chart,
+        final_output,
+        metric_params_ui,
+        selected_config,
+        selected_data,
+        selected_metric,
+        selected_metric_ins,
+    )
 
 
 @app.cell
