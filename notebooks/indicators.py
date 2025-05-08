@@ -231,3 +231,26 @@ def valley(series: pd.Series) -> pd.Series:
             valley_mask[i] = 1
 
     return pd.Series(valley_mask, index=series.index)
+
+
+def fisher_transform(series: pd.Series, period: int = 10) -> pd.Series:
+    highest = series.rolling(period, min_periods=1).max()
+    lowest = series.rolling(period, min_periods=1).min()
+    values = np.zeros(len(series))
+    fishers = np.zeros(len(series))
+
+    for i in range(1, len(series)):
+        values[i] = (
+            0.66
+            * (
+                (series.iloc[i] - lowest.iloc[i]) / (highest.iloc[i] - lowest.iloc[i])
+                - 0.5
+            )
+            + 0.67 * values[i - 1]
+        )
+        values[i] = max(min(values[i], 0.999), -0.999)
+        fishers[i] = (
+            0.5 * np.log((1 + values[i]) / (1 - values[i])) + 0.5 * fishers[i - 1]
+        )
+
+    return pd.Series(fishers, index=series.index)
