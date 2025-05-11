@@ -16,7 +16,7 @@ def get_fear_greed_index(limit: int = 10, timeout: int = 5) -> pd.DataFrame:
         .sort_values("datetime", ascending=True)
         .set_index("datetime")
         .drop(columns=["timestamp"])
-        .rename(columns={"value_classification": "sentiment"})
+        .rename(columns={"value_classification": "sentiment", "value": "fgi"})
     )
 
 

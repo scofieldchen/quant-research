@@ -58,7 +58,7 @@ def _(pd):
 
 
 @app.cell
-def _(List, mo, pd, read_metrics, signals):
+def _(List, mo, np, pd, read_metrics, signals):
     # 参数
     btcusd_filepath = "./data/btcusd.csv"
 
@@ -108,6 +108,22 @@ def _(List, mo, pd, read_metrics, signals):
                 "bband_lower_std": mo.ui.number(value=2.0),
             },
         },
+        "fear_greed_index": {
+            "filepath": "./data/fear_greed_index.csv",
+            "class": signals.FearGreedIndex,
+            "params": {
+                "smooth_period": mo.ui.number(value=10),
+                "extreme_greed_threshold": mo.ui.number(value=80),
+                "extreme_fear_threshold": mo.ui.number(value=20),
+            },
+        },
+        "greed_days": {
+            "filepath": "./data/fear_greed_index.csv",
+            "class": signals.ConsecutiveGreedDays,
+            "params": {
+                "extreme_level": mo.ui.number(value=40),
+            },
+        },
     }
 
     # 读取数据，计算指标信号
@@ -123,11 +139,11 @@ def _(List, mo, pd, read_metrics, signals):
     signals_df = (
         pd.concat({m.name: m.signals["signal"] for m in all_metrics}, axis=1)
         .ffill()
-        .dropna()
+        .replace({np.nan: 0})
         .astype(int)
         .replace({0: "neutral", 1: "peak", -1: "valley"})
     )
-    signals_df
+    # signals_df.tail(10)
     return (
         all_metrics,
         btcusd_filepath,
