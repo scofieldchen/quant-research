@@ -305,14 +305,14 @@ class APIFutureMetricsDownloader(FutureMetricsDownloader):
 if __name__ == "__main__":
     # 参数
     symbol = "BTCUSDT"
-    start_date = dt.datetime(2025, 3, 10, tzinfo=dt.UTC)
-    end_date = dt.datetime(2025, 3, 15, tzinfo=dt.UTC)
-    data_directory = "/users/scofield/quant-research/bitcoin_cycle/data2"
+    start_date = dt.datetime(2025, 5, 11, tzinfo=dt.UTC)
+    end_date = dt.datetime(2025, 5, 14, tzinfo=dt.UTC)
+    data_directory = "/users/scofield/quant-research/bitcoin_cycle/data/metrics"
 
     # 从历史仓库下载数据
-    # historical_downloader = HistoricalFutureMetricsDownloader(data_directory)
-    # historical_downloader.download(symbol, start_date, end_date)
+    historical_downloader = HistoricalFutureMetricsDownloader(data_directory)
+    historical_downloader.download(symbol, start_date, end_date)
 
     # 从API下载数据
-    api_downloader = APIFutureMetricsDownloader(data_directory)
-    api_downloader.download(symbol, start_date, end_date)
+    # api_downloader = APIFutureMetricsDownloader(data_directory)
+    # api_downloader.download(symbol, start_date, end_date)

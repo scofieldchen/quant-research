@@ -13,10 +13,19 @@ from indicators import find_trend_periods, fisher_transform, lowpass_filter
 class Metric(ABC):
     """代表指标的抽象基类"""
 
-    def __init__(self, data: pd.DataFrame, chart_rows: int = 2, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        data: pd.DataFrame,
+        chart_rows: int = 2,
+        chart_width: int = 1000,
+        chart_height: int = 700,
+        **kwargs: Any,
+    ) -> None:
         """初始化指标"""
         self.data = data
         self.chart_rows = chart_rows
+        self.chart_width = chart_width
+        self.chart_height = chart_height
         self._validate_data()
         self.signals: pd.DataFrame | None = None
 
@@ -102,8 +111,8 @@ class Metric(ABC):
                 y=0.95,
                 font=dict(size=20),
             ),
-            width=1000,
-            height=700,
+            width=self.chart_width,
+            height=self.chart_height,
             template="plotly_white",
             showlegend=True,
             legend=dict(
