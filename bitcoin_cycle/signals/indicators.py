@@ -6,16 +6,6 @@ import numpy as np
 
 
 def calculate_mmi(data: pd.Series, period: int) -> pd.Series:
-    """
-    Calculate the Market Meanness Index (MMI) for asset prices.
-
-    Args:
-        data (pd.Series): The price series.
-        period (int): The lookback period of the indicator, must be greater than 1.
-
-    Returns:
-        pd.Series: The Market Meanness Index (MMI) values.
-    """
     # 参数验证
     if not isinstance(data, pd.Series):
         raise TypeError("data must be a pandas Series")
@@ -47,17 +37,6 @@ def calculate_mmi(data: pd.Series, period: int) -> pd.Series:
 
 
 def calculate_fractal_dimension(data: pd.Series, period: int) -> pd.Series:
-    """
-    Calculate the Fractal Dimension for asset prices.
-
-    Args:
-        data (pd.Series): The price series.
-        period (int): The lookback period of the indicator, must be greater than 1
-            and will be converted to even number if odd.
-
-    Returns:
-        pd.Series: The Fractal Dimension values.
-    """
     if not isinstance(data, pd.Series):
         raise TypeError("data must be a pandas Series")
     if not isinstance(period, int):
@@ -138,18 +117,6 @@ def super_smoother_three_pole(x: pd.Series, period: int = 10) -> pd.Series:
 def super_smoother(
     x: pd.Series, period: int = 10, method: str = "two_pole"
 ) -> pd.Series:
-    """
-    Implementation of ehler's supersmoother
-
-    Args:
-        x (pd.Series): input series
-        period (int): cutoff period
-        method (str): 'two_pole' or 'three_pole', 2 Pole Smoother is considered as a better
-            approximation of price, 3 Pole Smoother has superior smoothing
-
-    Returns:
-        pd.Series of smoothing values
-    """
     if method == "two_pole":
         return super_smoother_two_pole(x, period)
     elif method == "three_pole":
@@ -159,17 +126,6 @@ def super_smoother(
 
 
 def lowpass_filter(x: pd.Series, period: int = 10) -> pd.Series:
-    """
-    Lowpass filter by john ehlers
-
-    Args:
-        x (pd.Series): input series
-        period (int): cutoff period, suppress high frequency components with cycle length
-            lower than this value
-
-    Returns:
-        pd.Series with smoothing values
-    """
     a = 2.0 / (1 + period)
 
     out = np.zeros(len(x))
@@ -189,15 +145,6 @@ def lowpass_filter(x: pd.Series, period: int = 10) -> pd.Series:
 
 
 def peak(series: pd.Series) -> pd.Series:
-    """
-    找出时间序列中的所有局部高点
-    局部高点定义：series(t-1) < series(t) and series(t+1) < series(t)
-
-    参数:
-        series: pd.Series - 输入的时间序列
-    返回:
-        pd.Series - 一个和输入序列长度相同的序列，1表示局部高点，0表示非局部高点
-    """
     length = len(series)
 
     if length < 3:
@@ -213,15 +160,6 @@ def peak(series: pd.Series) -> pd.Series:
 
 
 def valley(series: pd.Series) -> pd.Series:
-    """
-    找出时间序列中的所有局部低点
-    局部低点定义：series(t-1) > series(t) and series(t+1) > series(t)
-
-    参数:
-        series: pd.Series - 输入的时间序列
-    返回:
-        pd.Series - 一个和输入序列长度相同的序列，1表示局部低点，0表示非局部低点
-    """
     length = len(series)
 
     if length < 3:
@@ -260,7 +198,6 @@ def fisher_transform(series: pd.Series, period: int = 10) -> pd.Series:
 
 
 def find_trend_periods(series: pd.Series) -> List[Tuple[dt.datetime, dt.datetime]]:
-    """找到连续的1的开始时间和结束时间"""
     periods = []
     start = None
 

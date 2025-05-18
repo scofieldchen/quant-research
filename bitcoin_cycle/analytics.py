@@ -47,9 +47,9 @@ def _(pd):
 
 
     def color_signal(value: str) -> str:
-        if value == "peak":
+        if value.lower() == "peak":
             color = "red"
-        elif value == "valley":
+        elif value.lower() == "valley":
             color = "green"
         else:
             color = ""
@@ -59,10 +59,10 @@ def _(pd):
 
 @app.cell
 def _(List, mo, np, pd, read_metrics, signals):
-    # 参数
+    # 比特币历史价格文件
     btcusd_filepath = "./data/btcusd.csv"
 
-    # 指标配置，存储在字典中，指标名称 -> 数据文件路径，信号类
+    # 指标配置
     metric_config = {
         "sth_realized_price": {
             "filepath": "./data/sth_realized_price.csv",
@@ -124,6 +124,36 @@ def _(List, mo, np, pd, read_metrics, signals):
                 "extreme_level": mo.ui.number(value=40),
             },
         },
+        "toptrader_long_short_ratio_account": {
+            "filepath": "./data/long_short_ratio.csv",
+            "class": signals.LongShortRatioAccount,
+            "params": {
+                "smooth_period": mo.ui.number(value=10),
+                "rolling_period": mo.ui.number(value=200),
+                "lower_band_percentile": mo.ui.number(value=0.05),
+                "upper_band_percentile": mo.ui.number(value=0.95),
+            },
+        },
+        "toptrader_long_short_ratio_position": {
+            "filepath": "./data/long_short_ratio.csv",
+            "class": signals.LongShortRatioPosition,
+            "params": {
+                "smooth_period": mo.ui.number(value=10),
+                "rolling_period": mo.ui.number(value=200),
+                "lower_band_percentile": mo.ui.number(value=0.05),
+                "upper_band_percentile": mo.ui.number(value=0.95),
+            },
+        },
+        "long_short_ratio": {
+            "filepath": "./data/long_short_ratio.csv",
+            "class": signals.LongShortRatio,
+            "params": {
+                "smooth_period": mo.ui.number(value=10),
+                "rolling_period": mo.ui.number(value=200),
+                "lower_band_percentile": mo.ui.number(value=0.05),
+                "upper_band_percentile": mo.ui.number(value=0.95),
+            },
+        },
     }
 
     # 读取数据，计算指标信号
@@ -141,7 +171,7 @@ def _(List, mo, np, pd, read_metrics, signals):
         .ffill()
         .replace({np.nan: 0})
         .astype(int)
-        .replace({0: "neutral", 1: "peak", -1: "valley"})
+        .replace({0: "Neutral", 1: "Peak", -1: "Valley"})
     )
     # signals_df.tail(10)
     return (
