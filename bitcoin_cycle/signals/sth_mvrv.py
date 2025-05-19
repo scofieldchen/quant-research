@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from .base import Metric
-from .indicators import fisher_transform
+from .indicators import lowpass_filter
 
 
 class STHMVRV(Metric):
@@ -15,16 +15,17 @@ class STHMVRV(Metric):
 
     @property
     def description(self) -> str:
-        return "使用 Fisher 变换分析短期持有者市值实现值比率(STH-MVRV)，识别潜在的市场顶部和底部。"
+        pass
 
     def __init__(
         self,
         data: pd.DataFrame,
         price_col: str = "btcusd",
         mvrv_col: str = "sth_mvrv",
-        smooth_period: int = 10,
-        fisher_period: int = 200,
-        threshold: float = 2.0,
+        smooth_period: int = 7,
+        rolling_period: int = 200,
+        upper_band_percentile: float = 0.95,
+        lower_band_percentile: float = 0.05,
     ) -> None:
         """
         初始化 STHMVRV 指标类
@@ -33,15 +34,17 @@ class STHMVRV(Metric):
             data: 包含 STH-MVRV 数据的 DataFrame
             price_col: DataFrame 中表示比特币价格列的名称
             mvrv_col: DataFrame 中 STH-MVRV 列的名称
-            smooth_period: 移动平均平滑周期
-            fisher_period: Fisher 变换的计算周期
-            threshold: 计算峰值/谷值信号的阈值
+            smooth_period: 平滑窗口。
+            rolling_period: 计算滚动百分位数通道的窗口。
+            upper_band_percentile: 通道上轨百分位数。
+            lower_band_percentile: 通道下轨百分位数。
         """
         self.price_col = price_col
         self.mvrv_col = mvrv_col
         self.smooth_period = smooth_period
-        self.fisher_period = fisher_period
-        self.threshold = threshold
+        self.rolling_period = rolling_period
+        self.upper_band_percentile = upper_band_percentile
+        self.lower_band_percentile = lower_band_percentile
         super().__init__(data)
 
     def _validate_data(self) -> None:
@@ -52,41 +55,91 @@ class STHMVRV(Metric):
     def generate_signals(self) -> None:
         self.signals = self.data.copy()
 
-        # 计算平滑的 MVRV
-        smoothed = (
-            self.signals[self.mvrv_col]
-            .rolling(self.smooth_period, min_periods=1)
-            .mean()
+        self.signals["smooth_mvrv"] = lowpass_filter(
+            self.signals[self.mvrv_col], self.smooth_period
+        )
+        self.signals["upper_band"] = (
+            self.signals["smooth_mvrv"]
+            .rolling(self.rolling_period)
+            .quantile(self.upper_band_percentile)
+        )
+        self.signals["lower_band"] = (
+            self.signals["smooth_mvrv"]
+            .rolling(self.rolling_period)
+            .quantile(self.lower_band_percentile)
         )
 
-        # 计算 Fisher 变换
-        normalized = fisher_transform(smoothed, self.fisher_period)
-        self.signals["normalized_mvrv"] = normalized
-
-        # 生成信号
-        signals = np.where(normalized > self.threshold, 1, 0)
-        signals = np.where(normalized < -self.threshold, -1, signals)
+        signals = np.where(
+            self.signals["smooth_mvrv"] >= self.signals["upper_band"], 1, 0
+        )
+        signals = np.where(
+            self.signals["smooth_mvrv"] <= self.signals["lower_band"],
+            -1,
+            signals,
+        )
         self.signals["signal"] = signals
 
     def _add_indicator_traces(self, fig: go.Figure) -> None:
-        # 添加 MVRV 曲线
+        # 添加原始指标曲线
         fig.add_trace(
             go.Scatter(
                 x=self.signals.index,
-                y=self.signals["normalized_mvrv"],
-                name="Normalized STH-MVRV",
+                y=self.signals[self.mvrv_col],
+                name="STH-MVRV",
+                line=dict(color="#add8e6", width=1.5),
+                opacity=0.5,
+                hoverinfo="x+y",
             ),
             row=2,
             col=1,
         )
 
-        # 添加阈值线
-        for level in [-self.threshold, self.threshold]:
-            fig.add_hline(
-                y=level,
-                row=2,
-                col=1,
-                line_dash="dash",
-                line_color="grey",
-                line_width=0.8,
-            )
+        # 添加移动平滑曲线
+        fig.add_trace(
+            go.Scatter(
+                x=self.signals.index,
+                y=self.signals["smooth_mvrv"],
+                name="Smooth STH-MVRV",
+                line=dict(color="royalblue", width=2),
+                hoverinfo="x+y",
+            ),
+            row=2,
+            col=1,
+        )
+
+        # 添加百分位数通道
+        fig.add_trace(
+            go.Scatter(
+                x=self.signals.index,
+                y=self.signals["upper_band"],
+                line=dict(color="grey", width=1, dash="dot"),
+                showlegend=False,
+                hoverinfo="skip",
+                mode="lines",
+            ),
+            row=2,
+            col=1,
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=self.signals.index,
+                y=self.signals["lower_band"],
+                line=dict(color="grey", width=1, dash="dot"),
+                showlegend=False,
+                hoverinfo="skip",
+                mode="lines",
+                fill="tonexty",
+                fillcolor="rgba(128, 128, 128, 0.1)",
+            ),
+            row=2,
+            col=1,
+        )
+
+        # 更新 y 轴设置
+        fig.update_yaxes(
+            row=2,
+            col=1,
+            title="USD",
+            title_font=dict(size=14),
+            gridcolor="#e0e0e0",
+        )

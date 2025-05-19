@@ -120,26 +120,26 @@ class Metric(ABC):
                 x=0.5,  # 将图例放置在图表中间
                 xanchor="center",  # 图例水平对其方式
             ),
-            xaxis=dict(
-                rangeselector=dict(
-                    buttons=list(
-                        [
-                            dict(
-                                count=3, label="3m", step="month", stepmode="backward"
-                            ),
-                            dict(
-                                count=6, label="6m", step="month", stepmode="backward"
-                            ),
-                            dict(count=1, label="1y", step="year", stepmode="backward"),
-                            dict(count=2, label="2y", step="year", stepmode="backward"),
-                            dict(count=5, label="5y", step="year", stepmode="backward"),
-                            dict(step="all"),
-                        ]
-                    )
-                ),
-                rangeslider=dict(visible=False),
-                type="date",
-            ),
+            # xaxis=dict(
+            #     rangeselector=dict(
+            #         buttons=list(
+            #             [
+            #                 dict(
+            #                     count=3, label="3m", step="month", stepmode="backward"
+            #                 ),
+            #                 dict(
+            #                     count=6, label="6m", step="month", stepmode="backward"
+            #                 ),
+            #                 dict(count=1, label="1y", step="year", stepmode="backward"),
+            #                 dict(count=2, label="2y", step="year", stepmode="backward"),
+            #                 dict(count=5, label="5y", step="year", stepmode="backward"),
+            #                 dict(step="all"),
+            #             ]
+            #         )
+            #     ),
+            #     rangeslider=dict(visible=False),
+            #     type="date",
+            # ),
         )
 
         fig.update_yaxes(

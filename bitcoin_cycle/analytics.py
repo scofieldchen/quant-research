@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.11.31"
+__generated_with = "0.13.10"
 app = marimo.App(width="medium")
 
 
@@ -21,7 +21,7 @@ def _():
     from plotly.subplots import make_subplots
 
     import signals
-    return List, dt, go, make_subplots, np, pd, signals
+    return List, dt, np, pd, signals
 
 
 @app.cell
@@ -68,35 +68,40 @@ def _(List, mo, np, pd, read_metrics, signals):
             "filepath": "./data/sth_realized_price.csv",
             "class": signals.STHRealizedPrice,
             "params": {
-                "period": mo.ui.number(value=200),
-                "threshold": mo.ui.number(value=2.0),
+                "smooth_period": mo.ui.number(value=7),
+                "rolling_period": mo.ui.number(value=200),
+                "lower_band_percentile": mo.ui.number(value=0.01),
+                "upper_band_percentile": mo.ui.number(value=0.99),
             },
         },
         "sth_sopr": {
             "filepath": "./data/sth_sopr.csv",
             "class": signals.STHSOPR,
             "params": {
-                "bband_period": mo.ui.number(value=200),
-                "bband_upper_std": mo.ui.number(value=2.0),
-                "bband_lower_std": mo.ui.number(value=1.5),
+                "smooth_period": mo.ui.number(value=7),
+                "rolling_period": mo.ui.number(value=200),
+                "lower_band_percentile": mo.ui.number(value=0.05),
+                "upper_band_percentile": mo.ui.number(value=0.95),
             },
         },
         "sth_nupl": {
             "filepath": "./data/sth_nupl.csv",
             "class": signals.STHNUPL,
             "params": {
-                "smooth_period": mo.ui.number(value=10),
-                "fisher_period": mo.ui.number(value=200),
-                "threshold": mo.ui.number(value=2.0),
+                "smooth_period": mo.ui.number(value=7),
+                "rolling_period": mo.ui.number(value=200),
+                "lower_band_percentile": mo.ui.number(value=0.05),
+                "upper_band_percentile": mo.ui.number(value=0.95),
             },
         },
         "sth_mvrv": {
             "filepath": "./data/sth_mvrv.csv",
             "class": signals.STHMVRV,
             "params": {
-                "smooth_period": mo.ui.number(value=10),
-                "fisher_period": mo.ui.number(value=200),
-                "threshold": mo.ui.number(value=2.0),
+                "smooth_period": mo.ui.number(value=7),
+                "rolling_period": mo.ui.number(value=200),
+                "lower_band_percentile": mo.ui.number(value=0.05),
+                "upper_band_percentile": mo.ui.number(value=0.95),
             },
         },
         "nrpl": {
@@ -174,16 +179,7 @@ def _(List, mo, np, pd, read_metrics, signals):
         .replace({0: "Neutral", 1: "Peak", -1: "Valley"})
     )
     # signals_df.tail(10)
-    return (
-        all_metrics,
-        btcusd_filepath,
-        config,
-        data,
-        metric_cls,
-        metric_config,
-        name,
-        signals_df,
-    )
+    return btcusd_filepath, metric_config, signals_df
 
 
 @app.cell
@@ -210,7 +206,7 @@ def _(color_signal, end_date_ui, mo, pd, signals_df, start_date_ui):
 
     # 展示控件和结果
     mo.vstack([start_date_ui, end_date_ui, mo.md(styled_dashboard.to_html())])
-    return dashboard, end_date_val, start_date_val, styled_dashboard
+    return
 
 
 @app.cell
@@ -227,7 +223,7 @@ def _(metric_config, mo):
 
     # 点击按钮 -> 更新输出
     btn = mo.ui.run_button(label="更新图表", kind="success")
-    return btn, metric_dropdown_ui, metric_ids
+    return btn, metric_dropdown_ui
 
 
 @app.cell
@@ -269,16 +265,7 @@ def _(
     mo.vstack(
         [metric_dropdown_ui, *metric_params_ui, btn, mo.md("---"), *final_output]
     )
-    return (
-        args,
-        chart,
-        final_output,
-        metric_params_ui,
-        selected_config,
-        selected_data,
-        selected_metric,
-        selected_metric_ins,
-    )
+    return
 
 
 @app.cell
