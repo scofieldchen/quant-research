@@ -5,9 +5,9 @@ import pandas as pd
 import yfinance as yf
 from rich.console import Console
 
-from alternative import get_fear_greed_index
-from bgeometrics import BGClient
-from binance import HistoricalFutureMetricsDownloader
+from source.alternative import get_fear_greed_index
+from source.bgeometrics import BGClient
+from source.binance import HistoricalFutureMetricsDownloader
 
 console = Console()
 
