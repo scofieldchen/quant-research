@@ -1,9 +1,9 @@
-import talib
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
 from .base import Metric
+from .indicators import lowpass_filter
 
 
 class NRPL(Metric):
@@ -15,16 +15,17 @@ class NRPL(Metric):
 
     @property
     def description(self) -> str:
-        return "使用布林带分析净实现盈亏(NRPL)，识别潜在的市场顶部和底部。"
+        pass
 
     def __init__(
         self,
         data: pd.DataFrame,
         price_col: str = "btcusd",
         nrpl_col: str = "nrpl",
-        bband_period: int = 200,
-        bband_upper_std: float = 2.0,
-        bband_lower_std: float = 2.0,
+        smooth_period: int = 7,
+        rolling_period: int = 200,
+        upper_band_percentile: float = 0.95,
+        lower_band_percentile: float = 0.05,
     ) -> None:
         """
         初始化 NRPL 指标类
@@ -33,15 +34,17 @@ class NRPL(Metric):
             data: 包含 NRPL 数据的 DataFrame
             price_col: DataFrame 中表示比特币价格列的名称
             nrpl_col: DataFrame 中 NRPL 列的名称
-            bband_period: 布林带计算周期
-            bband_upper_std: 上轨标准差乘数
-            bband_lower_std: 下轨标准差乘数
+            smooth_period: 平滑窗口。
+            rolling_period: 计算滚动百分位数通道的窗口。
+            upper_band_percentile: 通道上轨百分位数。
+            lower_band_percentile: 通道下轨百分位数。
         """
         self.price_col = price_col
         self.nrpl_col = nrpl_col
-        self.bband_period = bband_period
-        self.bband_upper_std = bband_upper_std
-        self.bband_lower_std = bband_lower_std
+        self.smooth_period = smooth_period
+        self.rolling_period = rolling_period
+        self.upper_band_percentile = upper_band_percentile
+        self.lower_band_percentile = lower_band_percentile
         super().__init__(data)
 
     def _validate_data(self) -> None:
@@ -52,51 +55,91 @@ class NRPL(Metric):
     def generate_signals(self) -> None:
         self.signals = self.data.copy()
 
-        # 计算布林带
-        bband_upper, _, bband_lower = talib.BBANDS(
-            self.signals[self.nrpl_col],
-            self.bband_period,
-            self.bband_upper_std,
-            self.bband_lower_std,
+        self.signals["smooth_nrpl"] = lowpass_filter(
+            self.signals[self.nrpl_col], self.smooth_period
+        )
+        self.signals["upper_band"] = (
+            self.signals["smooth_nrpl"]
+            .rolling(self.rolling_period)
+            .quantile(self.upper_band_percentile)
+        )
+        self.signals["lower_band"] = (
+            self.signals["smooth_nrpl"]
+            .rolling(self.rolling_period)
+            .quantile(self.lower_band_percentile)
         )
 
-        self.signals["upper_band"] = bband_upper
-        self.signals["lower_band"] = bband_lower
-
-        # 生成信号
-        signals = np.where(self.signals[self.nrpl_col] > bband_upper, 1, 0)
-        signals = np.where(self.signals[self.nrpl_col] < bband_lower, -1, signals)
+        signals = np.where(
+            self.signals["smooth_nrpl"] >= self.signals["upper_band"], 1, 0
+        )
+        signals = np.where(
+            self.signals["smooth_nrpl"] <= self.signals["lower_band"],
+            -1,
+            signals,
+        )
         self.signals["signal"] = signals
 
     def _add_indicator_traces(self, fig: go.Figure) -> None:
-        # 添加 NRPL 曲线
+        # 添加原始指标曲线
         fig.add_trace(
             go.Scatter(
                 x=self.signals.index,
                 y=self.signals[self.nrpl_col],
                 name="NRPL",
+                line=dict(color="#add8e6", width=1.5),
+                opacity=0.5,
+                hoverinfo="x+y",
             ),
             row=2,
             col=1,
         )
 
-        # 添加布林带
+        # 添加移动平滑曲线
+        fig.add_trace(
+            go.Scatter(
+                x=self.signals.index,
+                y=self.signals["smooth_nrpl"],
+                name="Smooth NRPL",
+                line=dict(color="royalblue", width=2),
+                hoverinfo="x+y",
+            ),
+            row=2,
+            col=1,
+        )
+
+        # 添加百分位数通道
         fig.add_trace(
             go.Scatter(
                 x=self.signals.index,
                 y=self.signals["upper_band"],
-                line=dict(color="gray", dash="dash"),
+                line=dict(color="grey", width=1, dash="dot"),
+                showlegend=False,
+                hoverinfo="skip",
+                mode="lines",
+            ),
+            row=2,
+            col=1,
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=self.signals.index,
+                y=self.signals["lower_band"],
+                line=dict(color="grey", width=1, dash="dot"),
+                showlegend=False,
+                hoverinfo="skip",
+                mode="lines",
+                fill="tonexty",
+                fillcolor="rgba(128, 128, 128, 0.1)",
             ),
             row=2,
             col=1,
         )
 
-        fig.add_trace(
-            go.Scatter(
-                x=self.signals.index,
-                y=self.signals["lower_band"],
-                line=dict(color="gray", dash="dash"),
-            ),
+        # 更新 y 轴设置
+        fig.update_yaxes(
             row=2,
             col=1,
+            title="USD",
+            title_font=dict(size=14),
+            gridcolor="#e0e0e0",
         )

@@ -13,6 +13,7 @@ def _():
 @app.cell
 def _():
     from typing import List
+    from pathlib import Path
     import datetime as dt
 
     import numpy as np
@@ -21,7 +22,7 @@ def _():
     from plotly.subplots import make_subplots
 
     import signals
-    return List, dt, np, pd, signals
+    return List, Path, dt, np, pd, signals
 
 
 @app.cell
@@ -58,14 +59,17 @@ def _(pd):
 
 
 @app.cell
-def _(List, mo, np, pd, read_metrics, signals):
-    # 比特币历史价格文件
-    btcusd_filepath = "./data/btcusd.csv"
+def _(List, Path, mo, np, pd, read_metrics, signals):
+    # 数据文件夹
+    data_dir = Path("/users/scofield/quant-research/bitcoin_cycle/data")
+
+    # 比特币数据路径
+    btcusd_filepath = data_dir / "btcusd.csv"
 
     # 指标配置
     metric_config = {
         "sth_realized_price": {
-            "filepath": "./data/sth_realized_price.csv",
+            "filepath": data_dir / "sth_realized_price.csv",
             "class": signals.STHRealizedPrice,
             "params": {
                 "smooth_period": mo.ui.number(value=7),
@@ -75,7 +79,7 @@ def _(List, mo, np, pd, read_metrics, signals):
             },
         },
         "sth_sopr": {
-            "filepath": "./data/sth_sopr.csv",
+            "filepath": data_dir / "sth_sopr.csv",
             "class": signals.STHSOPR,
             "params": {
                 "smooth_period": mo.ui.number(value=7),
@@ -85,7 +89,7 @@ def _(List, mo, np, pd, read_metrics, signals):
             },
         },
         "sth_nupl": {
-            "filepath": "./data/sth_nupl.csv",
+            "filepath": data_dir / "sth_nupl.csv",
             "class": signals.STHNUPL,
             "params": {
                 "smooth_period": mo.ui.number(value=7),
@@ -95,7 +99,7 @@ def _(List, mo, np, pd, read_metrics, signals):
             },
         },
         "sth_mvrv": {
-            "filepath": "./data/sth_mvrv.csv",
+            "filepath": data_dir / "sth_mvrv.csv",
             "class": signals.STHMVRV,
             "params": {
                 "smooth_period": mo.ui.number(value=7),
@@ -105,16 +109,17 @@ def _(List, mo, np, pd, read_metrics, signals):
             },
         },
         "nrpl": {
-            "filepath": "./data/nrpl.csv",
+            "filepath": data_dir / "nrpl.csv",
             "class": signals.NRPL,
             "params": {
-                "bband_period": mo.ui.number(value=200),
-                "bband_upper_std": mo.ui.number(value=2.0),
-                "bband_lower_std": mo.ui.number(value=2.0),
+                "smooth_period": mo.ui.number(value=7),
+                "rolling_period": mo.ui.number(value=200),
+                "lower_band_percentile": mo.ui.number(value=0.05),
+                "upper_band_percentile": mo.ui.number(value=0.95),
             },
         },
         "fear_greed_index": {
-            "filepath": "./data/fear_greed_index.csv",
+            "filepath": data_dir / "fear_greed_index.csv",
             "class": signals.FearGreedIndex,
             "params": {
                 "smooth_period": mo.ui.number(value=10),
@@ -123,14 +128,14 @@ def _(List, mo, np, pd, read_metrics, signals):
             },
         },
         "greed_days": {
-            "filepath": "./data/fear_greed_index.csv",
+            "filepath": data_dir / "fear_greed_index.csv",
             "class": signals.ConsecutiveGreedDays,
             "params": {
                 "extreme_level": mo.ui.number(value=40),
             },
         },
         "toptrader_long_short_ratio_account": {
-            "filepath": "./data/long_short_ratio.csv",
+            "filepath": data_dir / "long_short_ratio.csv",
             "class": signals.LongShortRatioAccount,
             "params": {
                 "smooth_period": mo.ui.number(value=10),
@@ -140,7 +145,7 @@ def _(List, mo, np, pd, read_metrics, signals):
             },
         },
         "toptrader_long_short_ratio_position": {
-            "filepath": "./data/long_short_ratio.csv",
+            "filepath": data_dir / "long_short_ratio.csv",
             "class": signals.LongShortRatioPosition,
             "params": {
                 "smooth_period": mo.ui.number(value=10),
@@ -150,7 +155,7 @@ def _(List, mo, np, pd, read_metrics, signals):
             },
         },
         "long_short_ratio": {
-            "filepath": "./data/long_short_ratio.csv",
+            "filepath": data_dir / "long_short_ratio.csv",
             "class": signals.LongShortRatio,
             "params": {
                 "smooth_period": mo.ui.number(value=10),
