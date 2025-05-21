@@ -21,7 +21,7 @@ class FearGreedIndex(Metric):
         self,
         data: pd.DataFrame,
         price_col: str = "btcusd",
-        fgi_col: str = "fgi",
+        metric_cols: str = "fgi",
         smooth_period: int = 10,
         extreme_greed_threshold: float = 80.0,
         extreme_fear_threshold: float = 20.0,
@@ -32,24 +32,18 @@ class FearGreedIndex(Metric):
         Args:
             data: 包含数据的 DataFrame
             price_col: DataFrame 中表示比特币价格列的名称
-            fgi_col: DataFrame 中表示恐慌贪婪指数列的名称
+            metric_cols: DataFrame 中表示恐慌贪婪指数列的名称
         """
-        self.price_col = price_col
-        self.fgi_col = fgi_col
         self.smooth_period = smooth_period
         self.extreme_greed_threshold = extreme_greed_threshold
         self.extreme_fear_threshold = extreme_fear_threshold
-        super().__init__(data)
-
-    def _validate_data(self) -> None:
-        for col in [self.price_col, self.fgi_col]:
-            if col not in self.data.columns:
-                raise ValueError(f"Input dataframe is missing required column: {col}")
+        super().__init__(data, price_col, metric_cols)
 
     def generate_signals(self) -> None:
         self.signals = self.data.copy()
+        metric_col = self.metric_cols[0]
         self.signals["smooth_fgi"] = lowpass_filter(
-            self.signals[self.fgi_col], self.smooth_period
+            self.signals[metric_col], self.smooth_period
         )
         signals = np.where(
             self.signals["smooth_fgi"] >= self.extreme_greed_threshold, 1, 0
@@ -63,13 +57,16 @@ class FearGreedIndex(Metric):
 
     def _add_indicator_traces(self, fig: go.Figure) -> None:
         # 添加原始指标
+        metric_col = self.metric_cols[0]
         fig.add_trace(
             go.Scatter(
                 x=self.signals.index,
-                y=self.signals[self.fgi_col],
+                y=self.signals[metric_col],
                 name="Fear greed index",
-                line=dict(color="#add8e6", width=1.5),
+                line=dict(color="lightblue", width=1.5),
                 opacity=0.5,
+                hovertemplate="<b>Date</b>: %{x}<br>"
+                + "<b>Value</b>: %{y:.1f}<br><extra></extra>",
             ),
             row=2,
             col=1,
@@ -82,6 +79,8 @@ class FearGreedIndex(Metric):
                 y=self.signals["smooth_fgi"],
                 name=f"Smoothed index({self.smooth_period}-days)",
                 line=dict(color="royalblue", width=2),
+                hovertemplate="<b>Date</b>: %{x}<br>"
+                + "<b>Value</b>: %{y:.1f}<br><extra></extra>",
             ),
             row=2,
             col=1,
@@ -130,7 +129,7 @@ class ConsecutiveGreedDays(Metric):
         self,
         data: pd.DataFrame,
         price_col: str = "btcusd",
-        sentiment_col: str = "sentiment",
+        metric_cols: str = "sentiment",
         extreme_level: int = 40,
     ) -> None:
         """
@@ -139,27 +138,18 @@ class ConsecutiveGreedDays(Metric):
         Args:
             data: 包含数据的 DataFrame
             price_col: DataFrame 中表示比特币价格列的名称
-            sentiment_col: DataFrame 中表示市场情绪状态的名称
+            metric_cols: DataFrame 中表示市场情绪状态的名称
         """
-        self.price_col = price_col
-        self.sentiment_col = sentiment_col
         self.extreme_level = extreme_level
-        super().__init__(data)
-
-    def _validate_data(self) -> None:
-        for col in [self.price_col, self.sentiment_col]:
-            if col not in self.data.columns:
-                raise ValueError(f"Input dataframe is missing required column: {col}")
+        super().__init__(data, price_col, metric_cols)
 
     def generate_signals(self) -> None:
         self.signals = self.data.copy()
         greed_days = np.zeros(len(self.signals), int)
 
+        metric_col = self.metric_cols[0]
         for i in range(1, len(greed_days)):
-            if self.signals[self.sentiment_col].iloc[i] in [
-                "Greed",
-                "Extreme Greed",
-            ]:
+            if self.signals[metric_col].iloc[i] in ["Greed", "Extreme Greed"]:
                 greed_days[i] = greed_days[i - 1] + 1
 
         self.signals["greed_days"] = greed_days

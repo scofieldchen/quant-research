@@ -1,9 +1,10 @@
-import numpy as np
+from typing import List, Union
+
 import pandas as pd
 import plotly.graph_objects as go
 
 from .base import Metric
-from .indicators import lowpass_filter
+from .utils import add_percentile_bands, calculate_percentile_bands
 
 
 class STHNUPL(Metric):
@@ -21,7 +22,7 @@ class STHNUPL(Metric):
         self,
         data: pd.DataFrame,
         price_col: str = "btcusd",
-        nupl_col: str = "sth_nupl",
+        metric_cols: Union[str, List[str]] = "sth_nupl",
         smooth_period: int = 7,
         rolling_period: int = 200,
         upper_band_percentile: float = 0.95,
@@ -33,113 +34,41 @@ class STHNUPL(Metric):
         Args:
             data: 包含 STH-NUPL 数据的 DataFrame
             price_col: DataFrame 中表示比特币价格列的名称
-            nupl_col: DataFrame 中 STH-NUPL 列的名称
+            metric_cols: DataFrame 中 STH-NUPL 列的名称
             smooth_period: 平滑窗口。
             rolling_period: 计算滚动百分位数通道的窗口。
             upper_band_percentile: 通道上轨百分位数。
             lower_band_percentile: 通道下轨百分位数。
         """
-        self.price_col = price_col
-        self.nupl_col = nupl_col
         self.smooth_period = smooth_period
         self.rolling_period = rolling_period
         self.upper_band_percentile = upper_band_percentile
         self.lower_band_percentile = lower_band_percentile
-        super().__init__(data)
-
-    def _validate_data(self) -> None:
-        for col in [self.price_col, self.nupl_col]:
-            if col not in self.data.columns:
-                raise ValueError(f"Input dataframe is missing required column: {col}")
+        super().__init__(data, price_col, metric_cols)
 
     def generate_signals(self) -> None:
-        self.signals = self.data.copy()
+        data = self.data.copy()
 
-        self.signals["smooth_nupl"] = lowpass_filter(
-            self.signals[self.nupl_col], self.smooth_period
+        # 使用工具函数计算百分位数通道
+        metric_col = self.metric_cols[0]  # 使用第一个指标列
+        self.signals = calculate_percentile_bands(
+            data=data,
+            input_col=metric_col,
+            smooth_period=self.smooth_period,
+            rolling_period=self.rolling_period,
+            upper_band_percentile=self.upper_band_percentile,
+            lower_band_percentile=self.lower_band_percentile,
         )
-        self.signals["upper_band"] = (
-            self.signals["smooth_nupl"]
-            .rolling(self.rolling_period)
-            .quantile(self.upper_band_percentile)
-        )
-        self.signals["lower_band"] = (
-            self.signals["smooth_nupl"]
-            .rolling(self.rolling_period)
-            .quantile(self.lower_band_percentile)
-        )
-
-        signals = np.where(
-            self.signals["smooth_nupl"] >= self.signals["upper_band"], 1, 0
-        )
-        signals = np.where(
-            self.signals["smooth_nupl"] <= self.signals["lower_band"],
-            -1,
-            signals,
-        )
-        self.signals["signal"] = signals
 
     def _add_indicator_traces(self, fig: go.Figure) -> None:
-        # 添加原始指标曲线
-        fig.add_trace(
-            go.Scatter(
-                x=self.signals.index,
-                y=self.signals[self.nupl_col],
-                name="STH-NUPL",
-                line=dict(color="#add8e6", width=1.5),
-                opacity=0.5,
-                hoverinfo="x+y",
-            ),
-            row=2,
-            col=1,
-        )
-
-        # 添加移动平滑曲线
-        fig.add_trace(
-            go.Scatter(
-                x=self.signals.index,
-                y=self.signals["smooth_nupl"],
-                name="Smooth STH-NUPL",
-                line=dict(color="royalblue", width=2),
-                hoverinfo="x+y",
-            ),
-            row=2,
-            col=1,
-        )
-
-        # 添加百分位数通道
-        fig.add_trace(
-            go.Scatter(
-                x=self.signals.index,
-                y=self.signals["upper_band"],
-                line=dict(color="grey", width=1, dash="dot"),
-                showlegend=False,
-                hoverinfo="skip",
-                mode="lines",
-            ),
-            row=2,
-            col=1,
-        )
-        fig.add_trace(
-            go.Scatter(
-                x=self.signals.index,
-                y=self.signals["lower_band"],
-                line=dict(color="grey", width=1, dash="dot"),
-                showlegend=False,
-                hoverinfo="skip",
-                mode="lines",
-                fill="tonexty",
-                fillcolor="rgba(128, 128, 128, 0.1)",
-            ),
-            row=2,
-            col=1,
-        )
-
-        # 更新 y 轴设置
-        fig.update_yaxes(
-            row=2,
-            col=1,
-            title="USD",
-            title_font=dict(size=14),
-            gridcolor="#e0e0e0",
+        # 添加指标和百分位数通道
+        metric_col = self.metric_cols[0]
+        add_percentile_bands(
+            fig=fig,
+            data=self.signals,
+            metric_col=metric_col,
+            smooth_metric_col="smooth_" + metric_col,
+            yaxis_title="STH-NUPL",
+            metric_name="STH-NUPL",
+            smooth_metric_name="Smooth STH-NUPL",
         )

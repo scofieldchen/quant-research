@@ -60,7 +60,7 @@ def add_percentile_bands(
                 x=data.index,
                 y=data[metric_col],
                 name=metric_name if metric_name else metric_col,
-                line=dict(color="blue", width=1.5),
+                line=dict(color="lightblue", width=1.5),
                 opacity=0.5,
                 hovertemplate="<b>Date</b>: %{x}<br>"
                 + "<b>Value</b>: %{y:.4f}<br><extra></extra>",
