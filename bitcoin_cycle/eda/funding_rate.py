@@ -1,7 +1,7 @@
 import marimo
 
 __generated_with = "0.13.10"
-app = marimo.App(width="full")
+app = marimo.App(width="medium")
 
 
 @app.cell
@@ -13,10 +13,11 @@ def _():
 @app.cell
 def _():
     import sys
+
     sys.path.insert(0, "/users/scofield/quant-research/bitcoin_cycle/")
 
     import datetime as dt
-    from typing import List, Dict, Any, Optional
+    from typing import List, Dict, Any, Optional, Union
     from concurrent.futures import ThreadPoolExecutor
     from pathlib import Path
 
@@ -32,7 +33,7 @@ def _():
         retry_if_exception_type,
     )
 
-    from signals.base import Metric
+    from signals.funding_rate import FundingRate
 
     yf.set_config(
         proxy={"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
@@ -40,13 +41,11 @@ def _():
     return (
         Any,
         Dict,
+        FundingRate,
         List,
-        Metric,
         Optional,
         ThreadPoolExecutor,
         dt,
-        go,
-        np,
         pd,
         requests,
         retry,
@@ -199,13 +198,18 @@ def _(
 
     def process_funding_rate(df: pd.DataFrame) -> pd.DataFrame:
         return (
-            df.assign(datetime=lambda x: pd.to_datetime(x["fundingTime"], unit="ms", utc=True),
-                      fundingRate=lambda x: pd.to_numeric(x["fundingRate"]))
+            df.assign(
+                datetime=lambda x: pd.to_datetime(
+                    x["fundingTime"], unit="ms", utc=True
+                ),
+                fundingRate=lambda x: pd.to_numeric(x["fundingRate"]),
+            )
             .sort_values("datetime")
             .set_index("datetime")
             .drop(columns=["symbol", "fundingTime", "markPrice"])
             .rename(columns={"fundingRate": "funding_rate"})
-            .resample("D").sum()  # 计算日总融资利率
+            .resample("D")
+            .sum()  # 计算日总融资利率
         )
 
 
@@ -248,149 +252,24 @@ def _(get_all_data):
 
 
 @app.cell
-def _(Metric, dt, go, np, pd):
-    class FundingRate(Metric):
-        """融资利率指标"""
-
-        @property
-        def name(self) -> str:
-            return "Funding Rate"
-
-        @property
-        def description(self) -> str:
-            pass
-
-        def __init__(
-            self,
-            data: pd.DataFrame,
-            price_col: str = "btcusd",
-            rate_col: str = "funding_rate",
-            cumulative_days: int = 30,
-            rolling_period: int = 200,
-            upper_band_percentile: float = 0.95,
-            lower_band_percentile: float = 0.05,
-        ) -> None:
-            """
-            初始化指标类
-
-            Args:
-                data: 包含 NRPL 数据的 DataFrame
-                price_col: DataFrame 中表示比特币价格列的名称
-                rate_col: DataFrame 中融资利率列的名称
-            """
-            self.price_col = price_col
-            self.rate_col = rate_col
-            self.cumulative_days = cumulative_days
-            self.rolling_period = rolling_period
-            self.upper_band_percentile = upper_band_percentile
-            self.lower_band_percentile = lower_band_percentile
-            super().__init__(data)
-
-        def _validate_data(self) -> None:
-            for col in [self.price_col, self.rate_col]:
-                if col not in self.data.columns:
-                    raise ValueError(f"Input dataframe is missing required column: {col}")
-
-        def generate_signals(self) -> None:
-            self.signals = self.data.copy()
-
-            self.signals["cum_rate"] = self.signals[self.rate_col].rolling(dt.timedelta(days=30)).sum()
-
-            self.signals["upper_band"] = (
-                self.signals["cum_rate"]
-                .rolling(self.rolling_period)
-                .quantile(self.upper_band_percentile)
-            )
-            self.signals["lower_band"] = (
-                self.signals["cum_rate"]
-                .rolling(self.rolling_period)
-                .quantile(self.lower_band_percentile)
-            )
-
-            signals = np.where(
-                self.signals["cum_rate"] >= self.signals["upper_band"], 1, 0
-            )
-            signals = np.where(
-                self.signals["cum_rate"] <= self.signals["lower_band"],
-                -1,
-                signals,
-            )
-            self.signals["signal"] = signals
-
-        def _add_indicator_traces(self, fig: go.Figure) -> None:
-            # 添加原始指标曲线
-            fig.add_trace(
-                go.Scatter(
-                    x=self.signals.index,
-                    y=self.signals["cum_rate"],
-                    name="Funding rate",
-                    line=dict(color="royalblue", width=2),
-                    hoverinfo="x+y",
-                ),
-                row=2,
-                col=1,
-            )
-
-            # # 添加移动平滑曲线
-            # fig.add_trace(
-            #     go.Scatter(
-            #         x=self.signals.index,
-            #         y=self.signals["smooth_nrpl"],
-            #         name="Smooth NRPL",
-            #         line=dict(color="royalblue", width=2),
-            #         hoverinfo="x+y",
-            #     ),
-            #     row=2,
-            #     col=1,
-            # )
-
-            # 添加百分位数通道
-            fig.add_trace(
-                go.Scatter(
-                    x=self.signals.index,
-                    y=self.signals["upper_band"],
-                    line=dict(color="grey", width=1, dash="dot"),
-                    showlegend=False,
-                    hoverinfo="skip",
-                    mode="lines",
-                ),
-                row=2,
-                col=1,
-            )
-            fig.add_trace(
-                go.Scatter(
-                    x=self.signals.index,
-                    y=self.signals["lower_band"],
-                    line=dict(color="grey", width=1, dash="dot"),
-                    showlegend=False,
-                    hoverinfo="skip",
-                    mode="lines",
-                    fill="tonexty",
-                    fillcolor="rgba(128, 128, 128, 0.1)",
-                ),
-                row=2,
-                col=1,
-            )
-
-            # 更新 y 轴设置
-            fig.update_yaxes(
-                row=2,
-                col=1,
-                title="Percent",
-                title_font=dict(size=14),
-                gridcolor="#e0e0e0",
-            )
-
-    return (FundingRate,)
-
-
-@app.cell
 def _(FundingRate, data):
-    metric = FundingRate(data, cumulative_days=30, rolling_period=200, upper_band_percentile=0.95, lower_band_percentile=0.05)
+    metric = FundingRate(
+        data,
+        cumulative_days=30,
+        rolling_period=200,
+        upper_band_percentile=0.95,
+        lower_band_percentile=0.05,
+    )
     metric.generate_signals()
     fig = metric.generate_chart()
 
     fig
+    return (metric,)
+
+
+@app.cell
+def _(metric):
+    metric.signals
     return
 
 

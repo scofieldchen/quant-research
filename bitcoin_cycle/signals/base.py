@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, List, Union
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -8,24 +9,36 @@ from plotly.subplots import make_subplots
 from .indicators import find_trend_periods
 
 
+@dataclass
+class ChartConfig:
+    """代表图表配置的类"""
+
+    rows: int = 2
+    cols: int = 1
+    width: int = 1000
+    height: int = 700
+
+
 class Metric(ABC):
     """代表指标的抽象基类"""
 
     def __init__(
         self,
         data: pd.DataFrame,
-        chart_rows: int = 2,
-        chart_width: int = 1000,
-        chart_height: int = 700,
-        **kwargs: Any,
+        price_col: str,
+        metric_cols: Union[str, List[str]],
+        chart_config: ChartConfig = None,
     ) -> None:
         """初始化指标"""
         self.data = data
-        self.chart_rows = chart_rows
-        self.chart_width = chart_width
-        self.chart_height = chart_height
-        self._validate_data()
+        self.price_col = price_col
+        if isinstance(metric_cols, str):
+            self.metric_cols = [metric_cols]
+        else:
+            self.metric_cols = metric_cols
+        self.chart_config = chart_config if chart_config else ChartConfig()
         self.signals: pd.DataFrame | None = None
+        self._validate_data()
 
     @property
     @abstractmethod
@@ -40,20 +53,32 @@ class Metric(ABC):
         pass
 
     @abstractmethod
-    def _validate_data(self) -> None:
-        """验证输入数据是否有效，由子类实现"""
-        pass
-
-    @abstractmethod
     def generate_signals(self) -> None:
         """计算交易信号，由子类实现"""
         pass
 
+    @abstractmethod
+    def _add_indicator_traces(self, fig: go.Figure) -> None:
+        """添加指标相关曲线，由子类实现"""
+        pass
+
+    def _validate_data(self) -> None:
+        """验证输入数据是否有效"""
+        if self.price_col not in self.data.columns:
+            raise ValueError(
+                f"Input dataframe is missing required price column: {self.price_col}"
+            )
+        for col in self.metric_cols:
+            if col not in self.data.columns:
+                raise ValueError(
+                    f"Input dataframe is missing required metric column: {col}"
+                )
+
     def _create_base_figure(self) -> go.Figure:
         """创建基础分层图表"""
         return make_subplots(
-            rows=self.chart_rows,
-            cols=1,
+            rows=self.chart_config.rows,
+            cols=self.chart_config.cols,
             shared_xaxes=True,
             vertical_spacing=0.05,
         )
@@ -75,6 +100,9 @@ class Metric(ABC):
 
     def _add_signal_backgrounds(self, fig: go.Figure) -> None:
         """添加信号背景区域"""
+        if "signal" not in self.signals:
+            return
+
         peak_periods = find_trend_periods(self.signals["signal"] == 1)
         valley_periods = find_trend_periods(self.signals["signal"] == -1)
 
@@ -109,8 +137,8 @@ class Metric(ABC):
                 y=0.95,
                 font=dict(size=20),
             ),
-            width=self.chart_width,
-            height=self.chart_height,
+            width=self.chart_config.width,
+            height=self.chart_config.height,
             template="plotly_white",
             showlegend=True,
             legend=dict(
@@ -120,26 +148,6 @@ class Metric(ABC):
                 x=0.5,  # 将图例放置在图表中间
                 xanchor="center",  # 图例水平对其方式
             ),
-            # xaxis=dict(
-            #     rangeselector=dict(
-            #         buttons=list(
-            #             [
-            #                 dict(
-            #                     count=3, label="3m", step="month", stepmode="backward"
-            #                 ),
-            #                 dict(
-            #                     count=6, label="6m", step="month", stepmode="backward"
-            #                 ),
-            #                 dict(count=1, label="1y", step="year", stepmode="backward"),
-            #                 dict(count=2, label="2y", step="year", stepmode="backward"),
-            #                 dict(count=5, label="5y", step="year", stepmode="backward"),
-            #                 dict(step="all"),
-            #             ]
-            #         )
-            #     ),
-            #     rangeslider=dict(visible=False),
-            #     type="date",
-            # ),
         )
 
         fig.update_yaxes(
@@ -150,11 +158,6 @@ class Metric(ABC):
             gridcolor="#E5E5E5",
             title_font=dict(size=14),
         )
-
-    @abstractmethod
-    def _add_indicator_traces(self, fig: go.Figure) -> None:
-        """添加指标相关曲线，由子类实现"""
-        pass
 
     def generate_chart(self) -> go.Figure:
         """生成完整的图表"""
