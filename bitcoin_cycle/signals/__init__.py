@@ -10,3 +10,4 @@ from .sth_mvrv import STHMVRV
 from .sth_nupl import STHNUPL
 from .sth_realized_price import STHRealizedPrice
 from .sth_sopr import STHSOPR
+from .funding_rate import FundingRate

@@ -22,7 +22,7 @@ def _():
     from plotly.subplots import make_subplots
 
     import signals
-    return List, Path, dt, np, pd, signals
+    return List, Path, dt, go, make_subplots, np, pd, signals
 
 
 @app.cell
@@ -164,6 +164,16 @@ def _(List, Path, mo, np, pd, read_metrics, signals):
                 "upper_band_percentile": mo.ui.number(value=0.95),
             },
         },
+        "funding_rate": {
+            "filepath": data_dir / "funding_rate.csv",
+            "class": signals.FundingRate,
+            "params": {
+                "cumulative_days": mo.ui.number(value=30),
+                "rolling_period": mo.ui.number(value=200),
+                "lower_band_percentile": mo.ui.number(value=0.05),
+                "upper_band_percentile": mo.ui.number(value=0.95),
+            },
+        },
     }
 
     # 读取数据，计算指标信号
@@ -184,7 +194,7 @@ def _(List, Path, mo, np, pd, read_metrics, signals):
         .replace({0: "Neutral", 1: "Peak", -1: "Valley"})
     )
     # signals_df.tail(10)
-    return btcusd_filepath, metric_config, signals_df
+    return all_metrics, btcusd_filepath, metric_config, signals_df
 
 
 @app.cell
@@ -211,6 +221,230 @@ def _(color_signal, end_date_ui, mo, pd, signals_df, start_date_ui):
 
     # 展示控件和结果
     mo.vstack([start_date_ui, end_date_ui, mo.md(styled_dashboard.to_html())])
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("## 综合信号")
+    return
+
+
+@app.cell
+def _(all_metrics, btcusd_filepath, pd):
+    def calculate_composite_signal(df: pd.DataFrame) -> pd.Series:
+        """计算综合性信号"""
+        # 计算可用指标的信号总和
+        sum_of_signals = df_signals.sum(axis=1, skipna=True)
+
+        # 计算当天可用指标的数量
+        count_of_available_signals = df_signals.notna().sum(axis=1)
+
+        # 计算平均信号
+        composite_signal = sum_of_signals.divide(count_of_available_signals)
+
+        # 如果某天没有任何可用指标，结果会是 NaN，用0填充
+        composite_signal = composite_signal.fillna(0)
+
+        return composite_signal
+
+
+    # 计算综合评分
+    df_signals = pd.concat(
+        {m.name: m.signals["signal"] for m in all_metrics}, axis=1
+    ).ffill()
+    composite_signal = calculate_composite_signal(df_signals)
+
+    # 获取比特币历史价格
+    btcusd = pd.read_csv(btcusd_filepath, index_col="datetime", parse_dates=True)
+
+    # 合并数据
+    composite_signals = pd.concat(
+        {"composite_signal": composite_signal, "btcusd": btcusd["close"]},
+        axis=1,
+        join="outer",
+    ).ffill()
+
+    # composite_signals
+    return (composite_signals,)
+
+
+@app.cell
+def _(composite_signals, go, make_subplots, np, pd):
+    def plot_composite_signal(data: pd.DataFrame) -> go.Figure:
+        """显示综合信号"""
+        # 创建图表对象
+        fig = make_subplots(
+            rows=2,
+            cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.05,
+        )
+
+        # 比特币价格
+        fig.add_trace(
+            go.Scatter(
+                x=data.index,
+                y=data["btcusd"],
+                name="BTC/USD",
+                line=dict(color="#F7931A", width=2),
+                hovertemplate="<b>Date</b>: %{x|%Y-%m-%d}<br>"
+                + "<b>Price</b>: $%{y:,.0f}<br><extra></extra>",
+            ),
+            row=1,
+            col=1,
+        )
+
+        # 综合信号
+        # 信号高于0用绿色填充，信号低于0用红色填充
+        # 边界线使用深蓝色
+        x_vals = data.index
+        y_signal = data["composite_signal"]
+
+        y_positive = np.where(y_signal >= 0, y_signal, 0)
+        y_negative = np.where(y_signal < 0, y_signal, 0)
+
+        fig.add_trace(
+            go.Scatter(
+                x=x_vals,
+                y=y_positive,
+                fill="tozeroy",
+                fillcolor="rgba(0, 128, 0, 0.3)",
+                line=dict(width=0),
+                name="Positive Signal Area",
+                hoverinfo="skip",
+                legendgroup="signal",
+                showlegend=False,
+            ),
+            row=2,
+            col=1,
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=x_vals,
+                y=y_negative,
+                fill="tozeroy",
+                fillcolor="rgba(255, 0, 0, 0.3)",
+                line=dict(width=0),
+                name="Negative Signal Area",
+                hoverinfo="skip",
+                legendgroup="signal",
+                showlegend=False,
+            ),
+            row=2,
+            col=1,
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=x_vals,
+                y=y_signal,
+                name="Composite Signal",
+                line=dict(color="royalblue", width=1.5),
+                hovertemplate="<b>Date</b>: %{x|%Y-%m-%d}<br>"
+                + "<b>Signal</b>: %{y:.4f}<br><extra></extra>",
+                legendgroup="signal",
+            ),
+            row=2,
+            col=1,
+        )
+
+        # 添加表示综合信号极端水平的信号线
+        fig.add_hline(
+            0,
+            row=2,
+            col=1,
+            line_dash="solid",
+            line_color="darkgrey",
+            line_width=1,
+        )
+
+        for level in [-0.5, 0.7]:
+            fig.add_hline(
+                level,
+                row=2,
+                col=1,
+                line_dash="dot",
+                line_color="grey",
+                line_width=1,
+                annotation_text=f"{level}",
+                annotation_position="bottom right" if level < 0 else "top right",
+                annotation_font_size=10,
+            )
+
+        # 更新图表布局
+        fig.update_layout(
+            title=dict(
+                text=f"<b>Bitcoin Cycle Model</b>",
+                x=0.5,
+                y=0.95,
+                font=dict(size=20),
+            ),
+            width=1000,
+            height=750,
+            template="plotly_white",
+            showlegend=True,
+            legend=dict(
+                orientation="h",  # 图例水平排列
+                yanchor="bottom",  # 图例垂直对其方式
+                y=1.02,  # 将图例放置在图表上方
+                x=0.5,  # 将图例放置在图表中间
+                xanchor="center",  # 图例水平对其方式
+            ),
+            hovermode="x unified",
+        )
+
+        # 调整y轴样式
+        fig.update_yaxes(
+            row=1,
+            col=1,
+            title_text="<b>Price (USD)</b>",
+            type="log",
+            gridcolor="#E0E0E0",
+            zerolinecolor="#C0C0C0",
+            zerolinewidth=1,
+            title_font=dict(size=14, family="Arial, sans-serif"),
+            tickfont=dict(size=11),
+        )
+
+        fig.update_yaxes(
+            row=2,
+            col=1,
+            title_text="<b>Composite Signal Value</b>",
+            gridcolor="#E0E0E0",
+            zerolinecolor="#C0C0C0",
+            zerolinewidth=1,
+            range=[
+                -1.1,
+                1.1,
+            ],
+            title_font=dict(size=14, family="Arial, sans-serif"),
+            tickfont=dict(size=11),
+            tickformat=".2f",
+        )
+
+        # 更新x轴样式
+        fig.update_xaxes(
+            gridcolor="#E0E0E0",
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikedash="dash",
+            spikecolor="grey",
+            spikethickness=1,
+            title_text="<b>Date</b>",
+            title_font=dict(size=14, family="Arial, sans-serif"),
+            tickfont=dict(size=11),
+            row=2,
+            col=1,
+        )
+
+        return fig
+
+
+    fig_composite_signal = plot_composite_signal(composite_signals)
+    fig_composite_signal
     return
 
 
