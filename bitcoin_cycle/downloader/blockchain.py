@@ -1,6 +1,10 @@
+from pathlib import Path
+from typing import List
+
 import pandas as pd
 import requests
-from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
+from rich.console import Console
+from tenacity import RetryError, retry, stop_after_attempt, wait_exponential
 
 # 模块级配置
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
@@ -14,6 +18,8 @@ METRICS_URL_MAP = {
     "nrpl": "https://charts.bgeometrics.com/files/nrpl.json",
     "realized_profit_loss_ratio": "https://charts.bgeometrics.com/files/realized_profit_loss_ratio.json",
 }
+
+console = Console()
 
 
 class DataFetchError(Exception):
@@ -139,15 +145,29 @@ class BGClient:
         return self.get_metric("realized_profit_loss_ratio")
 
 
-if __name__ == "__main__":
+def download_blockchain_metrics(data_directory: Path, metric_names: List[str]) -> None:
+    """从 bgeometrics 下载区块链数据"""
     client = BGClient()
 
-    # 使用通用方法
-    df = client.get_metric("sth_mvrv")
-    print(df.head())
+    for metric in metric_names:
+        try:
+            df = client.get_metric(metric)
+            console.print(f"✅ Downloaded blockchain metric: {metric}")
+        except Exception as e:
+            console.print(f"[red]Failed to download {metric}: {str(e)}")
+        else:
+            filepath = data_directory / f"{metric}.csv"
+            df.to_csv(filepath, index=True)
 
-    # 使用便捷方法
-    # df = client.get_sth_realized_price()
-    # df = client.get_nrpl()
-    df = client.get_realized_profit_loss_ratio()
-    print(df.tail())
+
+if __name__ == "__main__":
+    metrics = [
+        "sth_realized_price",
+        "sth_sopr",
+        "sth_nupl",
+        "sth_mvrv",
+        "nrpl",
+    ]
+    download_blockchain_metrics(
+        Path("/users/scofield/quant-research/bitcoin_cycle/data"), metrics
+    )

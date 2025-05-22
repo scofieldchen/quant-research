@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 import requests
-from rich import print
+from rich.console import Console
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -53,6 +53,8 @@ METRICS_CONFIG = {
         "drop_columns": ["buyVol", "sellVol"],
     },
 }
+
+console = Console()
 
 
 def generate_date_range(
@@ -142,10 +144,10 @@ class FutureMetricsDownloader(ABC):
                 date = futures[future]
                 success, exception = future.result()
                 if success:
-                    print(f"Downloaded {symbol} data for {date:%Y-%m-%d}")
+                    console.print(f"Downloaded {symbol} data for {date:%Y-%m-%d}")
                 else:
-                    print(
-                        f"Failed to download {symbol} data for {date:%Y-%m-%d}: {str(exception)}"
+                    console.print(
+                        f"[red]Failed to download {symbol} for {date:%Y-%m-%d}: {str(exception)}"
                     )
 
 
@@ -302,17 +304,79 @@ class APIFutureMetricsDownloader(FutureMetricsDownloader):
         return joined_data
 
 
+def load_lsr(data_dir: Path) -> pd.DataFrame:
+    """从本地加载原始的历史多空比例数据"""
+    csv_files = sorted(data_dir.glob("*.csv"))
+
+    if not csv_files:
+        raise Exception(f"No data found in the directory: {str(data_dir)}")
+
+    # 过滤2022年以前的文件，因为其不包含多空比例数据
+    csv_files_2023_and_later = [file for file in csv_files if file.stem >= "20230101"]
+
+    return pd.concat(pd.read_csv(f) for f in csv_files_2023_and_later)
+
+
+def process_lsr(df: pd.DataFrame) -> pd.DataFrame:
+    """处理多空比例数据，转化为日频数据"""
+    drop_columns = [
+        "sum_open_interest",
+        "sum_open_interest_value",
+        "sum_taker_long_short_vol_ratio",
+    ]
+    rename_columns = {
+        "count_toptrader_long_short_ratio": "toptrader_long_short_ratio_account",
+        "sum_toptrader_long_short_ratio": "toptrader_long_short_ratio_position",
+        "count_long_short_ratio": "long_short_ratio",
+    }
+
+    df_processed = (
+        df.drop(columns=drop_columns)
+        .assign(datetime=lambda x: pd.to_datetime(x["datetime"]))
+        .set_index("datetime")
+        .shift(-1)  # 将时间序列向左移动一位，才能正确重采样
+        .dropna()
+        .resample("D")  # 重采样为日频数据
+        .last()  # 因为情绪指标是市场快照，所以使用当天最后一个值
+        .rename(columns=rename_columns)  # 使用更简洁的名称
+    )
+
+    return df_processed
+
+
+def download_lsr(data_directory: Path, symbol: str) -> None:
+    """下载多空比例数据(增量更新)"""
+    # 获取历史数据的最后一天
+    raw_data_dir = data_directory / "metrics" / symbol
+    csv_files = sorted(raw_data_dir.glob("*.csv"))
+    if not csv_files:
+        console.print(f"[yellow]Historical data not found: {raw_data_dir}")
+        console.print(f"Please download historical data first.")
+        return
+    last_date = dt.datetime.strptime(csv_files[-1].stem, "%Y%m%d")
+    last_date = last_date.replace(tzinfo=dt.timezone.utc)
+
+    # 更新数据的日期范围
+    start_date = last_date + dt.timedelta(days=1)
+    end_date = dt.datetime.now(tz=dt.timezone.utc)
+    if start_date.date() >= end_date.date():
+        console.print("[yellow]Long short ratio is already up to date.")
+        return
+
+    # 下载最新数据
+    downloader = HistoricalFutureMetricsDownloader(data_directory / "metrics")
+    downloader.download(symbol, start_date, end_date, max_workers=1)
+
+    # 读取和处理数据
+    lsr = load_lsr(raw_data_dir)
+    daily_lsr = process_lsr(lsr)
+
+    # 删除时间索引的时区信息，跟价格数据保持一致，时区默认为 UTC
+    daily_lsr.index = daily_lsr.index.tz_convert(None)
+
+    # 存储数据
+    daily_lsr.to_csv(data_directory / "long_short_ratio.csv", index=True)
+
+
 if __name__ == "__main__":
-    # 参数
-    symbol = "BTCUSDT"
-    start_date = dt.datetime(2025, 5, 11, tzinfo=dt.UTC)
-    end_date = dt.datetime(2025, 5, 14, tzinfo=dt.UTC)
-    data_directory = "/users/scofield/quant-research/bitcoin_cycle/data/metrics"
-
-    # 从历史仓库下载数据
-    historical_downloader = HistoricalFutureMetricsDownloader(data_directory)
-    historical_downloader.download(symbol, start_date, end_date)
-
-    # 从API下载数据
-    # api_downloader = APIFutureMetricsDownloader(data_directory)
-    # api_downloader.download(symbol, start_date, end_date)
+    download_lsr(Path("/users/scofield/quant-research/bitcoin_cycle/data"), "BTCUSDT")
