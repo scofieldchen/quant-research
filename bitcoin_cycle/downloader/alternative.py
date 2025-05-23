@@ -30,6 +30,9 @@ def download_fear_greed_index(filepath: Path) -> None:
     """下载恐慌和贪婪指数的历史数据并保存到本地"""
     try:
         df = get_fear_greed_index(10 * 365)
+        console.print(
+            f"✅ Downloaded fear and greed index, last:{df.index.max():%Y-%m-%d}"
+        )
     except Exception as e:
         console.print(f"[red]Failed to get fear greed index: {str(e)}")
     else:

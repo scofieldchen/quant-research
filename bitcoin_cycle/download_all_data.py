@@ -29,30 +29,28 @@ def main() -> None:
         start_date=dt.datetime(2014, 1, 1, tzinfo=dt.timezone.utc),
         end_date=end_date,
     )
-    console.print("✅ Downloaded ohlcv for BTCUSD")
 
-    metrics = [
-        "sth_realized_price",
-        "sth_sopr",
-        "sth_nupl",
-        "sth_mvrv",
-        "nrpl",
-    ]
-    download_blockchain_metrics(data_directory, metrics)
+    download_blockchain_metrics(
+        data_directory,
+        metric_names=[
+            "sth_realized_price",
+            "sth_sopr",
+            "sth_nupl",
+            "sth_mvrv",
+            "nrpl",
+        ],
+    )
 
     download_fear_greed_index(data_directory / "fear_greed_index.csv")
-    console.print("✅ Downloaded fear and greed index")
 
     download_lsr(data_directory, "BTCUSDT")
-    console.print("✅ Downloaded long short ratio for BTCUSDT")
 
     download_funding_rate(
-        data_directory / "funding_rate.py",
-        "BTCUSDT",
-        dt.datetime(2019, 1, 1, tzinfo=dt.timezone.utc),
-        end_date,
+        filepath=data_directory / "funding_rate.py",
+        symbol="BTCUSDT",
+        start_date=dt.datetime(2019, 1, 1, tzinfo=dt.timezone.utc),
+        end_date=end_date,
     )
-    console.print("✅ Downloaded funding rate for BTCUSDT")
 
 
 if __name__ == "__main__":

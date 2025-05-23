@@ -152,9 +152,13 @@ def download_blockchain_metrics(data_directory: Path, metric_names: List[str]) -
     for metric in metric_names:
         try:
             df = client.get_metric(metric)
-            console.print(f"✅ Downloaded blockchain metric: {metric}")
+            console.print(
+                f"✅ Downloaded blockchain metric: {metric}, last:{df.index.max():%Y-%m-%d}"
+            )
         except Exception as e:
-            console.print(f"[red]Failed to download {metric}: {str(e)}")
+            console.print(
+                f"[red]Failed to download blockchain metric: {metric}, error:{str(e)}"
+            )
         else:
             filepath = data_directory / f"{metric}.csv"
             df.to_csv(filepath, index=True)

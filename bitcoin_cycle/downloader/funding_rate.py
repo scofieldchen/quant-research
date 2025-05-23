@@ -161,6 +161,9 @@ def download_funding_rate(
         df = get_funding_rate(symbol, start_date, end_date)
         df_processed = process_funding_rate(df)
         df_processed.index = df_processed.index.tz_convert(None)
+        console.print(
+            f"✅ Downloaded funding rate for {symbol}, last:{df_processed.index.max():%Y-%m-%d}"
+        )
     except Exception as e:
         console.print(f"[red]Failed to download funding rate for {symbol}: {str(e)}")
     else:

@@ -143,11 +143,9 @@ class FutureMetricsDownloader(ABC):
             for future in as_completed(futures):
                 date = futures[future]
                 success, exception = future.result()
-                if success:
-                    console.print(f"Downloaded {symbol} data for {date:%Y-%m-%d}")
-                else:
+                if not success:
                     console.print(
-                        f"[red]Failed to download {symbol} for {date:%Y-%m-%d}: {str(exception)}"
+                        f"[red]Failed to download sentiment data: {str(exception)}"
                     )
 
 
@@ -376,6 +374,10 @@ def download_lsr(data_directory: Path, symbol: str) -> None:
 
     # 存储数据
     daily_lsr.to_csv(data_directory / "long_short_ratio.csv", index=True)
+
+    console.print(
+        f"✅ Downloaded long short ratio for {symbol}, last:{daily_lsr.index.max():%Y-%m-%d}"
+    )
 
 
 if __name__ == "__main__":

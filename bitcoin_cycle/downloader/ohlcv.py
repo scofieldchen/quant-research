@@ -2,9 +2,12 @@ import datetime as dt
 from pathlib import Path
 
 import yfinance as yf
+from rich.console import Console
 
 # 若无法从雅虎财经下载数据，设置 vpn 作为网络代理
 yf.set_config(proxy={"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"})
+
+console = Console()
 
 
 def download_ohlcv(
@@ -26,6 +29,8 @@ def download_ohlcv(
     data.columns = [x.lower() for x in data.columns]
 
     data.to_csv(filepath, index=True)
+
+    console.print(f"✅ Downloaded ohlcv for {symbol}, last:{data.index.max():%Y-%m-%d}")
 
 
 if __name__ == "__main__":
