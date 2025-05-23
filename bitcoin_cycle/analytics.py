@@ -22,12 +22,30 @@ def _():
     from plotly.subplots import make_subplots
 
     import signals
-    return List, Path, dt, go, make_subplots, np, pd, signals
+    from signals.utils import calculate_percentile_bands
+    from signals.indicators import find_trend_periods
+    return (
+        List,
+        Path,
+        dt,
+        find_trend_periods,
+        go,
+        make_subplots,
+        np,
+        pd,
+        signals,
+    )
 
 
 @app.cell
 def _(mo):
-    mo.md(r"""## 综合分析""")
+    mo.md(
+        r"""
+    ## 横截面分析
+
+    ---
+    """
+    )
     return
 
 
@@ -199,39 +217,98 @@ def _(List, Path, mo, np, pd, read_metrics, signals):
 
 @app.cell
 def _(dt, mo):
-    # 日期控件
     start_date_ui = mo.ui.date(
         label="开始日期",
         value=(dt.datetime.today() - dt.timedelta(days=10)).date(),
     )
     end_date_ui = mo.ui.date(label="结束日期", value=dt.datetime.today().date())
+
+    mo.hstack([start_date_ui, end_date_ui], justify="start")
     return end_date_ui, start_date_ui
 
 
 @app.cell
 def _(color_signal, end_date_ui, mo, pd, signals_df, start_date_ui):
-    # 读取UI控件的值
     start_date_val = pd.Timestamp(start_date_ui.value)
     end_date_val = pd.Timestamp(end_date_ui.value)
 
-    # 更新数据展示
     dashboard = signals_df.loc[start_date_val:end_date_val].T
     dashboard.columns = [col.strftime("%m.%d") for col in dashboard.columns]
-    styled_dashboard = dashboard.style.map(color_signal)
 
-    # 展示控件和结果
-    mo.vstack([start_date_ui, end_date_ui, mo.md(styled_dashboard.to_html())])
+    table_styles = [
+        {
+            "selector": "th",  # 表头单元格
+            "props": [
+                ("background-color", "#F8F9FA"),  # 淡灰色背景
+                ("color", "#212529"),  # 深灰色字体
+                ("font-weight", "bold"),  # 字体加粗
+                ("text-align", "center"),  # 文本居中
+                ("padding", "10px 8px"),  # 内边距 (上下10px, 左右8px)
+                ("border-bottom", "2px solid #DEE2E6"),  # 底部边框
+            ],
+        },
+        {
+            "selector": "td",  # 数据单元格
+            "props": [
+                ("text-align", "center"),  # 文本居中
+                ("padding", "8px"),  # 内边距
+                ("border", "1px solid #E9ECEF"),  # 细边框
+            ],
+        },
+        {
+            "selector": "tr:nth-child(even)",  # 偶数行
+            "props": [
+                ("background-color", "#F8F9FA")  # 淡灰色背景 (斑马纹)
+            ],
+        },
+        {
+            "selector": "tr:hover",  # 鼠标悬停在行上
+            "props": [
+                ("background-color", "#E9ECEF")  # 悬停时背景色变深
+            ],
+        },
+        {
+            "selector": "table",  # 整个表格
+            "props": [
+                ("border-collapse", "collapse"),  # 合并边框
+                ("width", "100%"),  # 宽度100%
+                ("font-family", '"Segoe UI", Arial, sans-serif'),  # 现代字体
+                ("box-shadow", "0 2px 4px rgba(0,0,0,0.1)"),  # 轻微阴影效果
+            ],
+        },
+    ]
+
+    # 应用颜色信号和自定义表格样式
+    styled_dashboard = dashboard.style.map(color_signal).set_table_styles(
+        table_styles
+    )
+
+    mo.md(styled_dashboard.to_html())
     return
 
 
 @app.cell
 def _(mo):
-    mo.md("## 综合信号")
+    mo.md(
+        """
+    ## 综合信号
+
+    ---
+    """
+    )
     return
 
 
 @app.cell
-def _(all_metrics, btcusd_filepath, pd):
+def _(
+    all_metrics,
+    btcusd_filepath,
+    find_trend_periods,
+    go,
+    make_subplots,
+    np,
+    pd,
+):
     def calculate_composite_signal(df: pd.DataFrame) -> pd.Series:
         """计算综合性信号"""
         # 计算可用指标的信号总和
@@ -249,29 +326,11 @@ def _(all_metrics, btcusd_filepath, pd):
         return composite_signal
 
 
-    # 计算综合评分
-    df_signals = pd.concat(
-        {m.name: m.signals["signal"] for m in all_metrics}, axis=1
-    ).ffill()
-    composite_signal = calculate_composite_signal(df_signals)
-
-    # 获取比特币历史价格
-    btcusd = pd.read_csv(btcusd_filepath, index_col="datetime", parse_dates=True)
-
-    # 合并数据
-    composite_signals = pd.concat(
-        {"composite_signal": composite_signal, "btcusd": btcusd["close"]},
-        axis=1,
-        join="outer",
-    ).ffill()
-
-    # composite_signals
-    return (composite_signals,)
-
-
-@app.cell
-def _(composite_signals, go, make_subplots, np, pd):
-    def plot_composite_signal(data: pd.DataFrame) -> go.Figure:
+    def plot_composite_signal(
+        data: pd.DataFrame,
+        peak_threshold: float = 0.7,
+        valley_threshold: float = -0.5,
+    ) -> go.Figure:
         """显示综合信号"""
         # 创建图表对象
         fig = make_subplots(
@@ -294,6 +353,36 @@ def _(composite_signals, go, make_subplots, np, pd):
             row=1,
             col=1,
         )
+
+        # 添加背景颜色显示潜在的顶部和底部
+        peak_periods = find_trend_periods(
+            data["composite_signal"] >= peak_threshold
+        )
+        valley_periods = find_trend_periods(
+            data["composite_signal"] <= valley_threshold
+        )
+
+        for x0, x1 in peak_periods:
+            fig.add_vrect(
+                x0=x0,
+                x1=x1,
+                fillcolor="#FF6B6B",
+                opacity=0.2,
+                line_width=0,
+                row=1,
+                col=1,
+            )
+
+        for x0, x1 in valley_periods:
+            fig.add_vrect(
+                x0=x0,
+                x1=x1,
+                fillcolor="#38A169",
+                opacity=0.2,
+                line_width=0,
+                row=1,
+                col=1,
+            )
 
         # 综合信号
         # 信号高于0用绿色填充，信号低于0用红色填充
@@ -360,7 +449,7 @@ def _(composite_signals, go, make_subplots, np, pd):
             line_width=1,
         )
 
-        for level in [-0.5, 0.7]:
+        for level in [valley_threshold, peak_threshold]:
             fig.add_hline(
                 level,
                 row=2,
@@ -443,67 +532,120 @@ def _(composite_signals, go, make_subplots, np, pd):
         return fig
 
 
-    fig_composite_signal = plot_composite_signal(composite_signals)
+    # 计算综合评分
+    df_signals = pd.concat(
+        {m.name: m.signals["signal"] for m in all_metrics}, axis=1
+    )
+    composite_signals = calculate_composite_signal(df_signals)
+
+    # 获取比特币历史价格
+    btcusd = pd.read_csv(btcusd_filepath, index_col="datetime", parse_dates=True)
+
+    # 合并数据
+    composite_signals_df = pd.concat(
+        {"composite_signal": composite_signals, "btcusd": btcusd["close"]},
+        axis=1,
+        join="outer",
+    )
+    # composite_signals_df
+    return composite_signals_df, plot_composite_signal
+
+
+@app.cell
+def _(mo):
+    peak_threshold_ui = mo.ui.number(
+        start=0, stop=1, step=0.01, value=0.5, label="顶部阈值"
+    )
+    valley_threshold_ui = mo.ui.number(
+        start=-1, stop=0, step=0.05, value=-0.5, label="底部阈值"
+    )
+
+    mo.hstack([peak_threshold_ui, valley_threshold_ui], justify="start")
+    return peak_threshold_ui, valley_threshold_ui
+
+
+@app.cell
+def _(
+    composite_signals_df,
+    peak_threshold_ui,
+    plot_composite_signal,
+    valley_threshold_ui,
+):
+    fig_composite_signal = plot_composite_signal(
+        composite_signals_df, peak_threshold_ui.value, valley_threshold_ui.value
+    )
     fig_composite_signal
     return
 
 
 @app.cell
 def _(mo):
-    mo.md(r"""## 时间序列""")
+    mo.md(
+        r"""
+    ## 时间序列分析
+
+    ---
+    """
+    )
     return
 
 
 @app.cell
 def _(metric_config, mo):
-    # 用户从下拉框中选择指标
+    # 从下拉框中选择指标
     metric_ids = list(metric_config.keys())
-    metric_dropdown_ui = mo.ui.dropdown(metric_ids)
+    metric_dropdown_ui = mo.ui.dropdown(metric_ids, value="sth_realized_price")
+    return (metric_dropdown_ui,)
 
-    # 点击按钮 -> 更新输出
-    btn = mo.ui.run_button(label="更新图表", kind="success")
-    return btn, metric_dropdown_ui
+
+@app.cell
+def _(metric_dropdown_ui, mo):
+    mo.md(f"""
+    选择指标：{metric_dropdown_ui}
+    """)
+
+    # metric_dropdown_ui
+    return
+
+
+@app.cell
+def _(metric_config, metric_dropdown_ui):
+    # 动态渲染指标参数ui
+    selected_metric_config = metric_config[metric_dropdown_ui.value]
+    selected_metric_params = selected_metric_config["params"]
+    selected_metric_params
+    return selected_metric_config, selected_metric_params
+
+
+@app.cell
+def _(mo):
+    btn = mo.ui.run_button(label="更新图表")
+    btn
+    return (btn,)
 
 
 @app.cell
 def _(
     btcusd_filepath,
     btn,
-    metric_config,
-    metric_dropdown_ui,
-    mo,
     read_metrics,
+    selected_metric_config,
+    selected_metric_params,
 ):
-    # 获取指标
-    selected_metric = metric_dropdown_ui.value
+    chart = None
 
-    # 使用列表存储参数控件，若用户未选择指标，则列表为空并不显示参数控件
-    metric_params_ui = []
-
-    # 最终输出，将图表存储在列表中
-    final_output = []
-
-    # 动态渲染参数控件
-    if selected_metric:
-        metric_params_ui = list(metric_config[selected_metric]["params"].values())
-
-    # 处理按钮逻辑
-    if btn.value and selected_metric:
-        selected_config = metric_config[selected_metric]
-        args = {k: v.value for k, v in selected_config["params"].items()}
-        selected_data = read_metrics(btcusd_filepath, selected_config["filepath"])
-        selected_metric_ins = selected_config["class"](selected_data, **args)
+    if btn.value:
+        args = {k: v.value for k, v in selected_metric_params.items()}
+        selected_data = read_metrics(
+            btcusd_filepath, selected_metric_config["filepath"]
+        )
+        selected_metric_ins = selected_metric_config["class"](
+            selected_data, **args
+        )
         selected_metric_ins.generate_signals()
         chart = selected_metric_ins.generate_chart()
 
-        # 更新最终输出
-        final_output.append(mo.md(f"选择指标: {selected_metric}"))
-        final_output.append(chart)
-
-    # 渲染所有参数控件和最终输出
-    mo.vstack(
-        [metric_dropdown_ui, *metric_params_ui, btn, mo.md("---"), *final_output]
-    )
+    chart
     return
 
 
