@@ -12,7 +12,7 @@ def _():
 
 @app.cell
 def _():
-    from typing import List
+    from typing import List, Any, Dict
     from pathlib import Path
     import datetime as dt
 
@@ -25,6 +25,8 @@ def _():
     from signals.utils import calculate_percentile_bands
     from signals.indicators import find_trend_periods
     return (
+        Any,
+        Dict,
         List,
         Path,
         dt,
@@ -41,7 +43,7 @@ def _():
 def _(mo):
     mo.md(
         r"""
-    ## 横截面分析
+    ## 🏛️ 横截面分析
 
     ---
     """
@@ -234,54 +236,7 @@ def _(color_signal, end_date_ui, mo, pd, signals_df, start_date_ui):
 
     dashboard = signals_df.loc[start_date_val:end_date_val].T
     dashboard.columns = [col.strftime("%m.%d") for col in dashboard.columns]
-
-    table_styles = [
-        {
-            "selector": "th",  # 表头单元格
-            "props": [
-                ("background-color", "#F8F9FA"),  # 淡灰色背景
-                ("color", "#212529"),  # 深灰色字体
-                ("font-weight", "bold"),  # 字体加粗
-                ("text-align", "center"),  # 文本居中
-                ("padding", "10px 8px"),  # 内边距 (上下10px, 左右8px)
-                ("border-bottom", "2px solid #DEE2E6"),  # 底部边框
-            ],
-        },
-        {
-            "selector": "td",  # 数据单元格
-            "props": [
-                ("text-align", "center"),  # 文本居中
-                ("padding", "8px"),  # 内边距
-                ("border", "1px solid #E9ECEF"),  # 细边框
-            ],
-        },
-        {
-            "selector": "tr:nth-child(even)",  # 偶数行
-            "props": [
-                ("background-color", "#F8F9FA")  # 淡灰色背景 (斑马纹)
-            ],
-        },
-        {
-            "selector": "tr:hover",  # 鼠标悬停在行上
-            "props": [
-                ("background-color", "#E9ECEF")  # 悬停时背景色变深
-            ],
-        },
-        {
-            "selector": "table",  # 整个表格
-            "props": [
-                ("border-collapse", "collapse"),  # 合并边框
-                ("width", "100%"),  # 宽度100%
-                ("font-family", '"Segoe UI", Arial, sans-serif'),  # 现代字体
-                ("box-shadow", "0 2px 4px rgba(0,0,0,0.1)"),  # 轻微阴影效果
-            ],
-        },
-    ]
-
-    # 应用颜色信号和自定义表格样式
-    styled_dashboard = dashboard.style.map(color_signal).set_table_styles(
-        table_styles
-    )
+    styled_dashboard = dashboard.style.map(color_signal)
 
     mo.md(styled_dashboard.to_html())
     return
@@ -291,7 +246,7 @@ def _(color_signal, end_date_ui, mo, pd, signals_df, start_date_ui):
 def _(mo):
     mo.md(
         """
-    ## 综合信号
+    ## 💹 综合信号
 
     ---
     """
@@ -582,7 +537,7 @@ def _(
 def _(mo):
     mo.md(
         r"""
-    ## 时间序列分析
+    ## 📈 时间序列分析
 
     ---
     """
@@ -592,60 +547,58 @@ def _(mo):
 
 @app.cell
 def _(metric_config, mo):
-    # 从下拉框中选择指标
+    # 从下拉框选择指标
     metric_ids = list(metric_config.keys())
-    metric_dropdown_ui = mo.ui.dropdown(metric_ids, value="sth_realized_price")
-    return (metric_dropdown_ui,)
+    metric_dropdown_input = mo.ui.dropdown(metric_ids, value="sth_realized_price")
+    return (metric_dropdown_input,)
 
 
 @app.cell
-def _(metric_dropdown_ui, mo):
-    mo.md(f"""
-    选择指标：{metric_dropdown_ui}
-    """)
+def _(metric_config, metric_dropdown_input, mo):
+    # 指标参数控件
+    metric_params_input = mo.ui.dictionary(metric_config[metric_dropdown_input.value]["params"])
 
-    # metric_dropdown_ui
-    return
+    # 点击按钮更新图表
+    btn_update_fig = mo.ui.run_button(label="更新图表")
 
-
-@app.cell
-def _(metric_config, metric_dropdown_ui):
-    # 动态渲染指标参数ui
-    selected_metric_config = metric_config[metric_dropdown_ui.value]
-    selected_metric_params = selected_metric_config["params"]
-    selected_metric_params
-    return selected_metric_config, selected_metric_params
-
-
-@app.cell
-def _(mo):
-    btn = mo.ui.run_button(label="更新图表")
-    btn
-    return (btn,)
+    mo.vstack([
+        mo.md("**选择指标**"),
+        metric_dropdown_input,
+        metric_params_input,
+        btn_update_fig,
+    ])
+    return btn_update_fig, metric_params_input
 
 
 @app.cell
 def _(
+    Any,
+    Dict,
     btcusd_filepath,
-    btn,
+    btn_update_fig,
+    go,
+    metric_config,
+    metric_dropdown_input,
+    metric_params_input,
+    mo,
     read_metrics,
-    selected_metric_config,
-    selected_metric_params,
 ):
-    chart = None
+    mo.stop(not btn_update_fig.value, mo.md("**Press button to generate chart.**"))
 
-    if btn.value:
-        args = {k: v.value for k, v in selected_metric_params.items()}
-        selected_data = read_metrics(
-            btcusd_filepath, selected_metric_config["filepath"]
-        )
-        selected_metric_ins = selected_metric_config["class"](
-            selected_data, **args
-        )
-        selected_metric_ins.generate_signals()
-        chart = selected_metric_ins.generate_chart()
+    def plot_metric_signals(metric_name: str, args: Dict[str, Any]) -> go.Figure:
+        config = metric_config[metric_name]
+        data = read_metrics(btcusd_filepath, config["filepath"])
+        metric_ins = config["class"](data, **args)
+        metric_ins.generate_signals()
+        fig = metric_ins.generate_chart()
+        return fig
 
-    chart
+    fig_metric_signals = plot_metric_signals(
+        metric_name=metric_dropdown_input.value,
+        args=metric_params_input.value
+    )
+
+    fig_metric_signals
     return
 
 
