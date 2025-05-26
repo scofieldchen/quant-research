@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.13.10"
+__generated_with = "0.13.11"
 app = marimo.App(width="medium")
 
 
@@ -19,11 +19,14 @@ def _():
     import numpy as np
     import pandas as pd
     import plotly.graph_objects as go
+    import plotly.io as pio
     from plotly.subplots import make_subplots
 
     import signals
     from signals.utils import calculate_percentile_bands
     from signals.indicators import find_trend_periods
+
+    pio.renderers.default = "plotly_mimetype"
     return (
         Any,
         Dict,
@@ -556,17 +559,21 @@ def _(metric_config, mo):
 @app.cell
 def _(metric_config, metric_dropdown_input, mo):
     # 指标参数控件
-    metric_params_input = mo.ui.dictionary(metric_config[metric_dropdown_input.value]["params"])
+    metric_params_input = mo.ui.dictionary(
+        metric_config[metric_dropdown_input.value]["params"]
+    )
 
     # 点击按钮更新图表
     btn_update_fig = mo.ui.run_button(label="更新图表")
 
-    mo.vstack([
-        mo.md("**选择指标**"),
-        metric_dropdown_input,
-        metric_params_input,
-        btn_update_fig,
-    ])
+    mo.vstack(
+        [
+            mo.md("**选择指标**"),
+            metric_dropdown_input,
+            metric_params_input,
+            btn_update_fig,
+        ]
+    )
     return btn_update_fig, metric_params_input
 
 
@@ -585,6 +592,7 @@ def _(
 ):
     mo.stop(not btn_update_fig.value, mo.md("**Press button to generate chart.**"))
 
+
     def plot_metric_signals(metric_name: str, args: Dict[str, Any]) -> go.Figure:
         config = metric_config[metric_name]
         data = read_metrics(btcusd_filepath, config["filepath"])
@@ -593,9 +601,9 @@ def _(
         fig = metric_ins.generate_chart()
         return fig
 
+
     fig_metric_signals = plot_metric_signals(
-        metric_name=metric_dropdown_input.value,
-        args=metric_params_input.value
+        metric_name=metric_dropdown_input.value, args=metric_params_input.value
     )
 
     fig_metric_signals
