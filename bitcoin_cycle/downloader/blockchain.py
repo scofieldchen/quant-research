@@ -17,6 +17,11 @@ METRICS_URL_MAP = {
     "miner_sell_presure": "https://charts.bgeometrics.com/files/miner_sell_presure.json",
     "nrpl": "https://charts.bgeometrics.com/files/nrpl.json",
     "realized_profit_loss_ratio": "https://charts.bgeometrics.com/files/realized_profit_loss_ratio.json",
+    "rhodl": "https://charts.bgeometrics.com/files/rhodl.json",
+    "vdd_multiple": "https://charts.bgeometrics.com/files/vdd_multiple.json",
+    "puell_multiple": "https://charts.bgeometrics.com/files/puell_multiple.json",
+    "nupl": "https://charts.bgeometrics.com/files/nupl.json",
+    "mvrv_zscore": "https://charts.bgeometrics.com/files/mvrv_zscore.json",
 }
 
 console = Console()
@@ -144,6 +149,21 @@ class BGClient:
     def get_realized_profit_loss_ratio(self) -> pd.DataFrame:
         return self.get_metric("realized_profit_loss_ratio")
 
+    def get_rhodl(self) -> pd.DataFrame:
+        return self.get_metric("rhodl")
+
+    def get_vdd_multiple(self) -> pd.DataFrame:
+        return self.get_metric("vdd_multiple")
+
+    def get_puell_multiple(self) -> pd.DataFrame:
+        return self.get_metric("puell_multiple")
+
+    def get_nupl(self) -> pd.DataFrame:
+        return self.get_metric("nupl")
+
+    def get_mvrv_zscore(self) -> pd.DataFrame:
+        return self.get_metric("mvrv_zscore")
+
 
 def download_blockchain_metrics(data_directory: Path, metric_names: List[str]) -> None:
     """从 bgeometrics 下载区块链数据"""
@@ -166,11 +186,16 @@ def download_blockchain_metrics(data_directory: Path, metric_names: List[str]) -
 
 if __name__ == "__main__":
     metrics = [
-        "sth_realized_price",
-        "sth_sopr",
-        "sth_nupl",
-        "sth_mvrv",
-        "nrpl",
+        # "sth_realized_price",
+        # "sth_sopr",
+        # "sth_nupl",
+        # "sth_mvrv",
+        # "nrpl",
+        "rhodl",
+        "vdd_multiple",
+        "puell_multiple",
+        "nupl",
+        "mvrv_zscore",
     ]
     download_blockchain_metrics(
         Path("/users/scofield/quant-research/bitcoin_cycle/data"), metrics
