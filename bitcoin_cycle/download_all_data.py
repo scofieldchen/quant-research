@@ -38,6 +38,7 @@ def main() -> None:
             "sth_nupl",
             "sth_mvrv",
             "nrpl",
+            "rhodl",
         ],
     )
 
