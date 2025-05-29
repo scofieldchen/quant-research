@@ -1,13 +1,12 @@
 import datetime as dt
 from pathlib import Path
 
-from rich.console import Console
-
 from downloader.alternative import download_fear_greed_index
 from downloader.blockchain import download_blockchain_metrics
 from downloader.funding_rate import download_funding_rate
 from downloader.ohlcv import download_ohlcv
 from downloader.sentiment import download_lsr
+from rich.console import Console
 
 console = Console()
 
@@ -39,6 +38,7 @@ def main() -> None:
             "sth_mvrv",
             "nrpl",
             "rhodl",
+            "mvrv_zscore",
         ],
     )
 
