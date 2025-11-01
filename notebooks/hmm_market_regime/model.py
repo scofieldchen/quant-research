@@ -104,9 +104,9 @@ def _(go, mo, oos_prices, predicted_states, run_btn):
 
     # 定义状态颜色
     state_colors = {
-        "Bull": "rgba(144, 238, 144, 0.9)",  # 浅绿色
-        "Risk": "rgba(255, 182, 193, 0.9)",  # 浅红色
-        "Range": "rgba(255, 255, 224, 0.9)",  # 浅黄色
+        "Bull": "rgba(0, 255, 0, 0.7)",  # 浅绿色
+        "Risk": "rgba(255, 0, 0, 0.7)",  # 浅红色
+        "Range": "rgba(255, 255, 0, 0.7)",  # 浅黄色
     }
 
     # 获取状态序列
