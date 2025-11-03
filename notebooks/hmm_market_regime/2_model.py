@@ -35,6 +35,7 @@ def _(mo):
 def _(Path, StandardScaler, file_selector, hmm, mo, pd):
     mo.stop(not file_selector.value)
 
+
     def train_hmm(
         features: pd.DataFrame,
         states: int = 3,
@@ -65,10 +66,10 @@ def _(Path, StandardScaler, file_selector, hmm, mo, pd):
     # 准备特征
     features_path = Path(file_selector.value[0].name)
     wfo_num = int(features_path.stem.split("_")[-1])
-    features = pd.read_csv(features_path, index_col="Date", parse_dates=True)
+    features = pd.read_csv(features_path, index_col="date", parse_dates=True)
 
     # 训练模型
-    model, scaler = train_hmm(features, states=4)
+    model, scaler = train_hmm(features, states=5)
     return features, model, scaler
 
 
@@ -125,28 +126,46 @@ def _(
         # 获取状态均值
         state_means = get_state_means(model, scaler, feature_names)
 
-        # 定义状态标签
-        labels = [
-            "bullish",  # 上涨趋势
-            "bearish",  # 下跌趋势
-            "range_high_vola",  # 宽幅震荡（高波动）
-            "range_low_vola",  # 窄幅震荡（低波动）
-        ]
+        # 按照 rising_prob 对状态进行排序
+        sorted_states = state_means["rising_prob"].sort_values().index
 
-        # 根据预定义的规则来识别状态
-        bullish_state = state_means["RisingProb"].idxmax()
-        bearish_state = state_means["RisingProb"].idxmin()
+        # 识别两端的最强趋势
+        bear_trend_id = sorted_states[0]  # rising_prob 最小
+        bull_trend_id = sorted_states[-1]  # rising_prob 最大
 
-        means_2 = state_means.drop(index=[bullish_state, bearish_state])
-        low_vola_state = means_2["ATR"].idxmin()
-        high_vola_state = means_2["ATR"].idxmax()
+        # 在剩余的状态中，根据atr_ratio区分 "Pause" 和 "Chop"
+        remaining_ids = sorted_states[1:-1]
+        remaining_means = state_means.loc[remaining_ids]
+        remaining_means
 
-        # 构建状态id到标签的字典
+        # 找到波动性最高/最低的那个
+        high_vol_chop_id = remaining_means["atr_ratio"].idxmax()
+        low_vol_id1 = remaining_means[
+            "atr_ratio"
+        ].idxmin()  # 可能是 Bull_Pause 或 Bear_Pause
+
+        # 剩余的最后一个
+        remaining_ids_set = set(remaining_ids) - {high_vol_chop_id, low_vol_id1}
+        low_vol_id2 = list(remaining_ids_set)[0]
+
+        # 根据 low_vol_id1和id2的 rising_prob 来确定哪个是 Bull_Pause, 哪个是 Bear_Pause
+        if (
+            state_means.loc[low_vol_id1, "rising_prob"]
+            > state_means.loc[low_vol_id2, "rising_prob"]
+        ):
+            bull_pause_id = low_vol_id1
+            bear_pause_id = low_vol_id2
+        else:
+            bull_pause_id = low_vol_id2
+            bear_pause_id = low_vol_id1
+
+        # 构建映射
         state_mapping = {
-            bullish_state: "bullish",
-            bearish_state: "bearish",
-            low_vola_state: "range_low_vola",
-            high_vola_state: "range_high_vola",
+            bull_trend_id: "bull_trend",
+            bear_trend_id: "bear_trend",
+            bull_pause_id: "bull_pause",
+            bear_pause_id: "bear_pause",
+            high_vol_chop_id: "high_vol_chop",
         }
 
         return state_mapping
@@ -212,12 +231,14 @@ def _(
 
 
     # 获取样本外数据
-    oos_prices = pd.read_csv("oos_prices.csv", index_col="Date", parse_dates=True)
-    oos_prices = oos_prices.query("WFO == @wfo_num")
+    oos_prices = pd.read_csv(
+        "BTCUSDT_oos_prices.csv", index_col="date", parse_dates=True
+    )
+    oos_prices = oos_prices.query("wfo == @wfo_num")
 
     # 样本外预测
     oos_features = oos_prices[
-        ["LogReturn", "RisingProb", "ATR", "Fisher", "Devia"]
+        ["log_return", "rising_prob", "atr_ratio", "fisher", "devia"]
     ]
     labels = map_states_to_labels(model, scaler, oos_features.columns)
     predicted_states = predict_state(model, scaler, oos_features, labels)
@@ -226,11 +247,13 @@ def _(
         predicted_states,
         selection=None,
         show_column_summaries=False,
+        show_data_types=False,
         format_mapping={
-            "bullish": "{:.1%}",
-            "bearish": "{:.1%}",
-            "range_low_vola": "{:.1%}",
-            "range_high_vola": "{:.1%}",
+            "bull_trend": "{:.1%}",
+            "bear_trend": "{:.1%}",
+            "bull_pause": "{:.1%}",
+            "bear_pause": "{:.1%}",
+            "high_vol_chop": "{:.1%}",
         },
     )
     return oos_prices, predicted_states
@@ -245,21 +268,22 @@ def _(file_selector, go, mo, oos_prices, predicted_states):
         data=[
             go.Candlestick(
                 x=oos_prices.index,
-                open=oos_prices["Open"],
-                high=oos_prices["High"],
-                low=oos_prices["Low"],
-                close=oos_prices["Close"],
+                open=oos_prices["open"],
+                high=oos_prices["high"],
+                low=oos_prices["low"],
+                close=oos_prices["close"],
                 name="BTCUSDT",
             )
         ]
     )
 
-    # 定义状态颜色
+    # 定义5种市场状态对应的颜色
     state_colors = {
-        "bullish": "rgba(0, 204, 0, 0.9)",  # 浅绿色
-        "bearish": "rgba(204, 0, 0, 0.9)",  # 浅红色
-        "range_low_vola": "rgba(0, 0, 255, 0.9)",  # 浅蓝色
-        "range_high_vola": "rgba(204, 204, 0, 0.9)",  # 浅黄色
+        "bull_trend": "rgba(34, 139, 34, 0.7)",  # 深绿色 - 强势上涨
+        "bear_trend": "rgba(220, 20, 60, 0.7)",  # 深红色 - 强势下跌
+        "bull_pause": "rgba(144, 238, 144, 0.5)",  # 浅绿色 - 上涨暂停/整理
+        "bear_pause": "rgba(255, 182, 193, 0.5)",  # 浅红色 - 下跌暂停/整理
+        "high_vol_chop": "rgba(65, 105, 225, 0.5)",  # 蓝色 - 高波动震荡
     }
 
     # 获取状态序列
@@ -305,11 +329,6 @@ def _(file_selector, go, mo, oos_prices, predicted_states):
     )
 
     fig
-    return
-
-
-@app.cell
-def _():
     return
 
 
