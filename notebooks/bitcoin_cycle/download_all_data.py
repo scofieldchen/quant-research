@@ -13,7 +13,7 @@ console = Console()
 
 def main() -> None:
     # 参数
-    data_directory = Path("/users/scofield/quant-research/bitcoin_cycle/data")
+    data_directory = Path("/users/scofield/quant-research/notebooks/bitcoin_cycle/data")
 
     # 创建数据目录
     data_directory.mkdir(parents=True, exist_ok=True)
@@ -38,7 +38,6 @@ def main() -> None:
             "sth_mvrv",
             "nrpl",
             "rhodl",
-            "mvrv_zscore",
         ],
     )
 
@@ -47,7 +46,7 @@ def main() -> None:
     download_lsr(data_directory, "BTCUSDT")
 
     download_funding_rate(
-        filepath=data_directory / "funding_rate.py",
+        filepath=data_directory / "funding_rate.csv",
         symbol="BTCUSDT",
         start_date=dt.datetime(2019, 1, 1, tzinfo=dt.timezone.utc),
         end_date=end_date,

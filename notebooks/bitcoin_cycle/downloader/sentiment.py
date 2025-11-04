@@ -24,7 +24,7 @@ METRICS_CONFIG = {
             "sumOpenInterest": "sum_open_interest",
             "sumOpenInterestValue": "sum_open_interest_value",
         },
-        "drop_columns": ["symbol"],
+        "drop_columns": ["symbol", "CMCCirculatingSupply"],
     },
     "top_trader_long_short_account_ratio": {
         "api_url": "/futures/data/topLongShortAccountRatio",
@@ -355,14 +355,12 @@ def download_lsr(data_directory: Path, symbol: str) -> None:
     last_date = last_date.replace(tzinfo=dt.timezone.utc)
 
     # 更新数据的日期范围
-    start_date = last_date + dt.timedelta(days=1)
+    start_date = last_date  # 覆盖最后一天的数据
     end_date = dt.datetime.now(tz=dt.timezone.utc)
-    if start_date.date() >= end_date.date():
-        console.print("[yellow]Long short ratio is already up to date.")
-        return
 
     # 下载最新数据
-    downloader = HistoricalFutureMetricsDownloader(data_directory / "metrics")
+    # downloader = HistoricalFutureMetricsDownloader(data_directory / "metrics")
+    downloader = APIFutureMetricsDownloader(data_directory / "metrics")
     downloader.download(symbol, start_date, end_date, max_workers=1)
 
     # 读取和处理数据
@@ -381,4 +379,6 @@ def download_lsr(data_directory: Path, symbol: str) -> None:
 
 
 if __name__ == "__main__":
-    download_lsr(Path("/users/scofield/quant-research/bitcoin_cycle/data"), "BTCUSDT")
+    download_lsr(
+        Path("/users/scofield/quant-research/notebooks/bitcoin_cycle/data"), "BTCUSDT"
+    )

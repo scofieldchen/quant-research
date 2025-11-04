@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.13.11"
+__generated_with = "0.17.5"
 app = marimo.App(width="medium")
 
 
@@ -44,13 +44,11 @@ def _():
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     ## 🏛️ 横截面分析
 
     ---
-    """
-    )
+    """)
     return
 
 
@@ -84,7 +82,7 @@ def _(pd):
 @app.cell
 def _(List, Path, mo, np, pd, read_metrics, signals):
     # 数据文件夹
-    data_dir = Path("/users/scofield/quant-research/bitcoin_cycle/data")
+    data_dir = Path("/users/scofield/quant-research/notebooks/bitcoin_cycle/data")
 
     # 比特币数据路径
     btcusd_filepath = data_dir / "btcusd.csv"
@@ -247,19 +245,17 @@ def _(color_signal, end_date_ui, mo, pd, signals_df, start_date_ui):
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
+    mo.md("""
     ## 💹 综合信号
 
     ---
-    """
-    )
+    """)
     return
 
 
 @app.cell
 def _(
-    all_metrics,
+    all_metrics: "List[signals.Metric]",
     btcusd_filepath,
     find_trend_periods,
     go,
@@ -538,13 +534,11 @@ def _(
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     ## 📈 时间序列分析
 
     ---
-    """
-    )
+    """)
     return
 
 
