@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.17.5"
+__generated_with = "0.18.4"
 app = marimo.App(width="medium")
 
 
@@ -17,10 +17,11 @@ def _():
     import plotly.io as pio
     import matplotlib.pyplot as plt
     import seaborn as sns
-    from sklearn.preprocessing import StandardScaler
 
     pio.templates.default = "seaborn"
-    return Path, mo, pd, plt, px, sns
+
+    data_dir = Path("data")
+    return Path, data_dir, mo, pd, plt, px, sns
 
 
 @app.cell
@@ -52,18 +53,20 @@ def _(Path, file_selector, mo):
 
 
 @app.cell
-def _(file_path, file_selector, mo, pd):
+def _(data_dir, file_path, file_selector, mo, pd):
     mo.stop(not file_selector.value)
 
     # 获取训练集
-    features = pd.read_csv(file_path, index_col="date", parse_dates=True)
+    features = pd.read_csv(
+        data_dir / file_path, index_col="date", parse_dates=True
+    )
 
     # 获取检验集
     asset, *_, wfo_num = file_path.stem.split("_")
     wfo_num = int(wfo_num)
 
     oos_prices = pd.read_csv(
-        f"{asset}_oos_prices.csv", index_col="date", parse_dates=True
+        data_dir / f"{asset}_oos_prices.csv", index_col="date", parse_dates=True
     )
     oos_prices = oos_prices.query("wfo == @wfo_num")
 
