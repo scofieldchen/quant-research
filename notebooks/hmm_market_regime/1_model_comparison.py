@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.17.5"
+__generated_with = "0.18.4"
 app = marimo.App(width="medium")
 
 
@@ -14,7 +14,9 @@ def _():
     import pandas as pd
     from sklearn.preprocessing import StandardScaler
     from hmmlearn import hmm
-    return Path, StandardScaler, hmm, mo, pd
+
+    data_dir = Path("data/")
+    return StandardScaler, data_dir, hmm, mo, pd
 
 
 @app.cell
@@ -62,7 +64,7 @@ def _(mo):
     form = (
         mo.md("""
         **设置参数**
-
+    
         {asset_selector}
 
         {wfo_nums_selector}
@@ -70,12 +72,21 @@ def _(mo):
         {states_slider}
         """)
         .batch(
-            asset_selector=mo.ui.dropdown(options=["BTCUSDT"], value="BTCUSDT"),
+            asset_selector=mo.ui.dropdown(
+                options=["BTCUSDT"], value="BTCUSDT", label="选择交易对"
+            ),
             wfo_nums_selector=mo.ui.multiselect(
-                options=list(range(1, 10)), value=[1, 3, 5, 7, 9]
+                options=list(range(1, 10)),
+                value=[1, 3, 5, 7, 9],
+                label="选择训练集",
             ),
             states_slider=mo.ui.range_slider(
-                start=3, stop=8, step=1, value=[3, 6], show_value=True
+                start=3,
+                stop=8,
+                step=1,
+                value=[3, 6],
+                show_value=True,
+                label="选择状态数范围",
             ),
         )
         .form()
@@ -86,7 +97,7 @@ def _(mo):
 
 
 @app.cell
-def _(Path, form, mo, pd, train_hmm):
+def _(data_dir, form, mo, pd, train_hmm):
     mo.stop(not form.value)
 
 
@@ -107,7 +118,7 @@ def _(Path, form, mo, pd, train_hmm):
         total=total_iterations, title="Train HMM models"
     ) as bar:
         for wfo_num in wfo_nums:
-            file_path = Path(f"{asset}_features_wfo_{wfo_num}.csv")
+            file_path = data_dir / f"{asset}_train_{wfo_num}.csv"
             features = pd.read_csv(file_path, index_col="date", parse_dates=True)
             bic[wfo_num] = {}
 

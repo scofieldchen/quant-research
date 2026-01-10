@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.17.5"
+__generated_with = "0.18.4"
 app = marimo.App(width="medium")
 
 
@@ -19,7 +19,9 @@ def _():
     from hmmlearn import hmm
 
     pio.templates.default = "simple_white"
-    return Path, StandardScaler, go, hmm, mo, pd
+
+    data_dir = Path("data/")
+    return Path, StandardScaler, data_dir, hmm, mo, pd, px
 
 
 @app.cell
@@ -32,7 +34,7 @@ def _(mo):
 
 
 @app.cell
-def _(Path, StandardScaler, file_selector, hmm, mo, pd):
+def _(Path, StandardScaler, data_dir, file_selector, hmm, mo, pd):
     mo.stop(not file_selector.value)
 
 
@@ -64,7 +66,7 @@ def _(Path, StandardScaler, file_selector, hmm, mo, pd):
 
 
     # 准备特征
-    features_path = Path(file_selector.value[0].name)
+    features_path = data_dir / Path(file_selector.value[0].name)
     wfo_num = int(features_path.stem.split("_")[-1])
     features = pd.read_csv(features_path, index_col="date", parse_dates=True)
 
@@ -179,6 +181,7 @@ def _(
 @app.cell
 def _(
     StandardScaler,
+    data_dir,
     file_selector,
     hmm,
     map_states_to_labels,
@@ -232,7 +235,7 @@ def _(
 
     # 获取样本外数据
     oos_prices = pd.read_csv(
-        "BTCUSDT_oos_prices.csv", index_col="date", parse_dates=True
+        data_dir / "BTCUSDT_oos_prices.csv", index_col="date", parse_dates=True
     )
     oos_prices = oos_prices.query("wfo == @wfo_num")
 
@@ -260,22 +263,11 @@ def _(
 
 
 @app.cell
-def _(file_selector, go, mo, oos_prices, predicted_states):
+def _(file_selector, mo, oos_prices, predicted_states, px):
     mo.stop(not file_selector.value)
 
-    # 创建蜡烛图
-    fig = go.Figure(
-        data=[
-            go.Candlestick(
-                x=oos_prices.index,
-                open=oos_prices["open"],
-                high=oos_prices["high"],
-                low=oos_prices["low"],
-                close=oos_prices["close"],
-                name="BTCUSDT",
-            )
-        ]
-    )
+    # 创建价格图表
+    fig = px.line(x=oos_prices.index, y=oos_prices["price"])
 
     # 定义5种市场状态对应的颜色
     state_colors = {
@@ -320,7 +312,7 @@ def _(file_selector, go, mo, oos_prices, predicted_states):
 
     # 更新布局
     fig.update_layout(
-        title="BTC/USDT Market Regime",
+        title="Predicted Market Regime",
         width=1000,
         height=600,
         xaxis_rangeslider_visible=False,
@@ -329,6 +321,11 @@ def _(file_selector, go, mo, oos_prices, predicted_states):
     )
 
     fig
+    return
+
+
+@app.cell
+def _():
     return
 
 
