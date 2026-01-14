@@ -73,6 +73,7 @@ def preprocess_data(sth_mvrv_file_path: Path, btcusd_file_path: Path):
     btcusd_df = pd.read_csv(btcusd_file_path, index_col=0, parse_dates=True)
     btcusd_df.index.name = "datetime"
     btcusd_df = btcusd_df[["close"]]
+    btcusd_df.rename(columns={"close": "btcusd"}, inplace=True)
 
     # 合并数据，按照时间戳合并
     merged_df = pd.merge(
