@@ -354,7 +354,7 @@ def _(analysis_df, find_trend_periods, go, make_subplots, pd):
 
     indicator_chart = create_indicator_chart(analysis_df)
     indicator_chart
-    return
+    return (indicator_chart,)
 
 
 @app.cell
@@ -534,6 +534,34 @@ def _():
     # # Display performance statistics
     # mo.md("**Detailed Performance Metrics:**")
     # stats.display()
+    return
+
+
+@app.cell
+def _(analysis_df, indicator_chart):
+    # 将分析结果保存到本地
+
+    import json
+    from pathlib import Path
+
+    output_dir = Path("/Users/scofield/quant-research/notebooks/sth_mvrv/outputs/")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # 关键指标和信号
+    summary = {
+        "last_date": analysis_df["datetime"].iloc[-1].strftime("%Y-%m-%d"),
+        "btcusd_price": analysis_df["btcusd"].iloc[-1],
+        "sth_mvrv": analysis_df["sth_mvrv"].iloc[-1],
+        "sth_mvrv_zscore": analysis_df["sth_mvrv_zscore"].iloc[-1],
+    }
+    with open(output_dir / "summary.json", "w") as f:
+        json.dump(summary, f, indent=2, ensure_ascii=False)
+
+    # 附加数据
+    analysis_df.tail(10).round(2).to_csv(output_dir / "sth_mvrv_zscore.csv")
+
+    # 保存图片
+    indicator_chart.write_image(output_dir / "indicator_chart.png", scale=3)
     return
 
 
