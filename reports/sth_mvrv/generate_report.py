@@ -2,7 +2,7 @@ import base64
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -58,9 +58,9 @@ class ReportGenerator:
 
     Attributes:
         data_dir (Path): 数据文件夹路径。
-        json_data (List[Dict[str, Any]]): 加载的所有 JSON 数据列表。
-        csv_data (List[pd.DataFrame]): 加载的所有 CSV 数据列表。
-        chart_images (List[str]): Base64 编码的图片列表。
+        json_data (list[dict[str, Any]]): 加载的所有 JSON 数据列表。
+        csv_data (list[pd.DataFrame]): 加载的所有 CSV 数据列表。
+        chart_images (list[str]): Base64 编码的图片列表。
     """
 
     def __init__(self, data_dir: Path):
@@ -76,9 +76,9 @@ class ReportGenerator:
         if not data_dir.exists():
             raise FileNotFoundError(f"数据文件夹不存在: {data_dir}")
         self.data_dir = data_dir
-        self.json_data: List[Dict[str, Any]] = []
-        self.csv_data: List[pd.DataFrame] = []
-        self.chart_images: List[str] = []
+        self.json_data: list[dict[str, Any]] = []
+        self.csv_data: list[pd.DataFrame] = []
+        self.chart_images: list[str] = []
         self._load_data()
 
     def _load_data(self) -> None:
@@ -132,14 +132,14 @@ class ReportGenerator:
 
         return "\n\n".join(context_parts)
 
-    def generate_report(self) -> Dict[str, Any]:
+    def generate_report(self) -> dict[str, Any]:
         """
         生成市场洞察报告。
 
         使用 LLM 基于加载的数据生成 Markdown 报告，并返回图表路径列表。
 
         Returns:
-            包含 'markdown' (str) 和 'charts' (List[Path]) 的字典。
+            包含 'markdown' (str) 和 'charts' (list[Path]) 的字典。
 
         Raises:
             Exception: 如果 LLM 调用失败。
@@ -187,7 +187,7 @@ class ReportGenerator:
             logger.error(f"生成报告时出错: {e}")
             raise
 
-    def save_to_directory(self, output_dir: Path, report: Dict[str, Any]) -> None:
+    def save_to_directory(self, output_dir: Path, report: dict[str, Any]) -> None:
         """
         将报告和图表保存到指定目录。
 
