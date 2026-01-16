@@ -72,8 +72,6 @@ def preprocess_data(sth_mvrv_file_path: Path, btcusd_file_path: Path):
     logger.info(f"使用 BTCUSD 数据: {btcusd_file_path}")
     btcusd_df = pd.read_csv(btcusd_file_path, index_col=0, parse_dates=True)
     btcusd_df.index.name = "datetime"
-    btcusd_df = btcusd_df[["close"]]
-    btcusd_df.rename(columns={"close": "btcusd"}, inplace=True)
 
     # 合并数据，按照时间戳合并
     merged_df = pd.merge(
@@ -86,7 +84,7 @@ def preprocess_data(sth_mvrv_file_path: Path, btcusd_file_path: Path):
     # 保存到 cleaned 目录
     cleaned_file_path = CLEANED_DATA_DIR / f"sth_mvrv.parquet"
     merged_df.to_parquet(cleaned_file_path, index=True)
-    logger.info(f"预处理后的数据已保存到 {cleaned_file_path}")
+    logger.info(f"预处理数据保存到 {cleaned_file_path}")
 
 
 if __name__ == "__main__":

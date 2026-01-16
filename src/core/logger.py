@@ -20,7 +20,7 @@ loguru_logger.add(
 loguru_logger.add(
     sys.stdout,
     level="INFO",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {extra[name]} | {message}",
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level}</level> | <cyan>{extra[name]}</cyan> | {message}",
     colorize=True,
 )
 
