@@ -17,8 +17,11 @@ from src.core.logger import get_logger
 load_dotenv()
 logger = get_logger("sthmvrv")
 
+# 数据目录
+INPUT_DIR = "/users/scofield/quant-research/notebooks/sth_mvrv/outputs"
+OUTPUT_DIR = "/users/scofield/quant-research/reports/sth_mvrv/drafts"
+
 # 选择支持多模态的模型
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 MODEL_NAME = "google/gemini-3-flash-preview"
 
 # 系统提示词：定义角色和规则
@@ -35,11 +38,7 @@ SYSTEM_PROMPT = """
 
 # 用户提示词模板：传递具体任务参数
 USER_PROMPT = """
-### 摘要数据
-{summary_data}
-
-### 相关数据（最后几行）
-{csv_data}
+{context}
 
 请基于以上数据和附加图片生成市场洞察。
 """
@@ -59,8 +58,8 @@ class ReportGenerator:
 
     Attributes:
         data_dir (Path): 数据文件夹路径。
-        summary_data (Dict[str, Any]): 加载的 JSON 摘要数据。
-        csv_data (str): 加载的 CSV 数据字符串（最后几行）。
+        json_data (List[Dict[str, Any]]): 加载的所有 JSON 数据列表。
+        csv_data (List[pd.DataFrame]): 加载的所有 CSV 数据列表。
         chart_images (List[str]): Base64 编码的图片列表。
     """
 
@@ -77,29 +76,29 @@ class ReportGenerator:
         if not data_dir.exists():
             raise FileNotFoundError(f"数据文件夹不存在: {data_dir}")
         self.data_dir = data_dir
-        self.summary_data: Dict[str, Any] = {}
-        self.csv_data: str = ""
+        self.json_data: List[Dict[str, Any]] = []
+        self.csv_data: List[pd.DataFrame] = []
         self.chart_images: List[str] = []
         self._load_data()
 
     def _load_data(self) -> None:
         """读取文件夹中的所有数据文件（JSON、CSV、PNG）。"""
         try:
-            # 读取 JSON 文件（假设只有一个 summary.json）
+            # 读取所有 JSON 文件
             json_files = list(self.data_dir.glob("*.json"))
-            if json_files:
-                with open(json_files[0], "r", encoding="utf-8") as f:
-                    self.summary_data = json.load(f)
-                logger.info(f"加载 JSON 数据: {json_files[0]}")
+            for json_file in json_files:
+                with open(json_file, "r", encoding="utf-8") as f:
+                    self.json_data.append(json.load(f))
+                logger.info(f"加载 JSON 数据: {json_file}")
 
-            # 读取 CSV 文件（假设只有一个，提取最后 10 行）
+            # 读取所有 CSV 文件
             csv_files = list(self.data_dir.glob("*.csv"))
-            if csv_files:
-                df = pd.read_csv(csv_files[0])
-                self.csv_data = df.tail(10).to_string(index=False)
-                logger.info(f"加载 CSV 数据: {csv_files[0]}")
+            for csv_file in csv_files:
+                df = pd.read_csv(csv_file)
+                self.csv_data.append(df)
+                logger.info(f"加载 CSV 数据: {csv_file}")
 
-            # 读取 PNG 文件（编码为 Base64）
+            # 读取所有 PNG 文件（编码为 Base64）
             png_files = list(self.data_dir.glob("*.png"))
             for png_file in png_files:
                 with open(png_file, "rb") as f:
@@ -110,6 +109,28 @@ class ReportGenerator:
         except Exception as e:
             logger.error(f"加载数据时出错: {e}")
             raise
+
+    def _format_data_for_prompt(self) -> str:
+        """
+        格式化 JSON 和 CSV 数据为字符串，用于插入用户提示词。
+
+        分别处理每个 JSON 和每个 CSV，不合并，以避免字段冲突。
+
+        Returns:
+            格式化后的文本字符串。
+        """
+        context_parts = []
+
+        # 格式化每个 JSON 数据
+        for i, data in enumerate(self.json_data):
+            context_parts.append(f"### JSON 数据 {i+1}\n{json.dumps(data, indent=2, ensure_ascii=False)}")
+
+        # 格式化每个 CSV 数据（提取最后 10 行）
+        for i, df in enumerate(self.csv_data):
+            csv_str = df.tail(10).to_string(index=False)
+            context_parts.append(f"### CSV 数据 {i+1}（最后 10 行）\n{csv_str}")
+
+        return "\n\n".join(context_parts)
 
     def generate_report(self) -> Dict[str, Any]:
         """
@@ -123,16 +144,15 @@ class ReportGenerator:
         Raises:
             Exception: 如果 LLM 调用失败。
         """
-        # 准备数据
-        summary_data_str = json.dumps(self.summary_data, indent=2, ensure_ascii=False)
-        csv_data_str = self.csv_data
+        # 获取格式化后的用户提示词文本
+        context = self._format_data_for_prompt()
 
         # 初始化 LLM
         llm = ChatOpenAI(
             model=MODEL_NAME,
             temperature=0.5,
             api_key=os.getenv("OPENROUTER_API_KEY"),
-            base_url=OPENROUTER_BASE_URL,
+            base_url=os.getenv("OPENROUTER_BASE_URL"),
             timeout=60,
             max_retries=3,
         )
@@ -142,12 +162,7 @@ class ReportGenerator:
             ("system", SYSTEM_PROMPT),
             HumanMessage(
                 content=[
-                    {
-                        "type": "text",
-                        "text": USER_PROMPT.format(
-                            summary_data=summary_data_str, csv_data=csv_data_str
-                        ),
-                    },
+                    {"type": "text", "text": USER_PROMPT.format(context=context)},
                 ]
                 + [
                     {"type": "image_url", "image_url": {"url": img}}
@@ -172,19 +187,19 @@ class ReportGenerator:
             logger.error(f"生成报告时出错: {e}")
             raise
 
-    def save_to_directory(self, output_dir: Path) -> None:
+    def save_to_directory(self, output_dir: Path, report: Dict[str, Any]) -> None:
         """
-        将生成的报告和图表保存到指定目录。
+        将报告和图表保存到指定目录。
 
         Args:
             output_dir: 输出目录路径。
+            report: generate_report() 返回的字典，包含 'markdown' 和 'charts'。
 
         Raises:
             Exception: 如果保存失败。
         """
         try:
             output_dir.mkdir(parents=True, exist_ok=True)
-            report = self.generate_report()
 
             # 保存 Markdown
             markdown_file = output_dir / "market_insight.md"
@@ -201,3 +216,9 @@ class ReportGenerator:
         except Exception as e:
             logger.error(f"保存报告时出错: {e}")
             raise
+
+
+if __name__ == "__main__":
+    generator = ReportGenerator(Path(INPUT_DIR))
+    report = generator.generate_report()
+    generator.save_to_directory(Path(OUTPUT_DIR), report)
