@@ -1,0 +1,203 @@
+import base64
+import json
+import os
+from pathlib import Path
+from typing import Any, Dict, List
+
+import pandas as pd
+from dotenv import load_dotenv
+from langchain_core.messages import HumanMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from pydantic import BaseModel, Field
+
+from src.core.logger import get_logger
+
+# 加载环境变量
+load_dotenv()
+logger = get_logger("sthmvrv")
+
+# 选择支持多模态的模型
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+MODEL_NAME = "google/gemini-3-flash-preview"
+
+# 系统提示词：定义角色和规则
+SYSTEM_PROMPT = """
+你是一位专业的加密货币市场分析师，擅长分析指标如 STH-MVRV Z-score。你的任务是基于提供的 JSON 摘要、CSV 数据和图表，生成简洁的市场洞察报告（Markdown 格式）。重点关注趋势、信号和比特币价格影响。
+
+### 约束条件
+1. **风格**：客观、数据驱动、适合社交媒体分享。
+2. **长度**：控制在 200-500 字，避免冗长。
+3. **内容**：解释 Z-score 值、趋势，并参考图片描述视觉元素（如峰值、谷值）。
+4. **格式**：输出纯 Markdown，无额外标记。包括标题、要点和结论。
+5. **语言**：使用中文，专业且易懂。
+"""
+
+# 用户提示词模板：传递具体任务参数
+USER_PROMPT = """
+### 摘要数据
+{summary_data}
+
+### 相关数据（最后几行）
+{csv_data}
+
+请基于以上数据和附加图片生成市场洞察。
+"""
+
+
+# 结构化输出模型
+class MarketInsightResponse(BaseModel):
+    markdown: str = Field(..., description="生成的 Markdown 格式市场洞察报告。")
+
+
+class ReportGenerator:
+    """
+    报告生成器类，用于为不同指标生成市场洞察报告。
+
+    该类读取指定文件夹中的数据文件（JSON、CSV、PNG），使用 LLM 生成 Markdown 报告，
+    并提供保存接口。支持多模态输入（图片传递给 LLM）以提高输出质量。
+
+    Attributes:
+        data_dir (Path): 数据文件夹路径。
+        summary_data (Dict[str, Any]): 加载的 JSON 摘要数据。
+        csv_data (str): 加载的 CSV 数据字符串（最后几行）。
+        chart_images (List[str]): Base64 编码的图片列表。
+    """
+
+    def __init__(self, data_dir: Path):
+        """
+        初始化报告生成器。
+
+        Args:
+            data_dir: 包含分析数据的文件夹路径（例如 notebooks/sth_mvrv/outputs）。
+
+        Raises:
+            FileNotFoundError: 如果文件夹不存在。
+        """
+        if not data_dir.exists():
+            raise FileNotFoundError(f"数据文件夹不存在: {data_dir}")
+        self.data_dir = data_dir
+        self.summary_data: Dict[str, Any] = {}
+        self.csv_data: str = ""
+        self.chart_images: List[str] = []
+        self._load_data()
+
+    def _load_data(self) -> None:
+        """读取文件夹中的所有数据文件（JSON、CSV、PNG）。"""
+        try:
+            # 读取 JSON 文件（假设只有一个 summary.json）
+            json_files = list(self.data_dir.glob("*.json"))
+            if json_files:
+                with open(json_files[0], "r", encoding="utf-8") as f:
+                    self.summary_data = json.load(f)
+                logger.info(f"加载 JSON 数据: {json_files[0]}")
+
+            # 读取 CSV 文件（假设只有一个，提取最后 10 行）
+            csv_files = list(self.data_dir.glob("*.csv"))
+            if csv_files:
+                df = pd.read_csv(csv_files[0])
+                self.csv_data = df.tail(10).to_string(index=False)
+                logger.info(f"加载 CSV 数据: {csv_files[0]}")
+
+            # 读取 PNG 文件（编码为 Base64）
+            png_files = list(self.data_dir.glob("*.png"))
+            for png_file in png_files:
+                with open(png_file, "rb") as f:
+                    encoded = base64.b64encode(f.read()).decode("utf-8")
+                    self.chart_images.append(f"data:image/png;base64,{encoded}")
+                logger.info(f"加载图片: {png_file}")
+
+        except Exception as e:
+            logger.error(f"加载数据时出错: {e}")
+            raise
+
+    def generate_report(self) -> Dict[str, Any]:
+        """
+        生成市场洞察报告。
+
+        使用 LLM 基于加载的数据生成 Markdown 报告，并返回图表路径列表。
+
+        Returns:
+            包含 'markdown' (str) 和 'charts' (List[Path]) 的字典。
+
+        Raises:
+            Exception: 如果 LLM 调用失败。
+        """
+        # 准备数据
+        summary_data_str = json.dumps(self.summary_data, indent=2, ensure_ascii=False)
+        csv_data_str = self.csv_data
+
+        # 初始化 LLM
+        llm = ChatOpenAI(
+            model=MODEL_NAME,
+            temperature=0.5,
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            base_url=OPENROUTER_BASE_URL,
+            timeout=60,
+            max_retries=3,
+        )
+
+        # 构建消息（多模态：文本 + 图片）
+        messages = [
+            ("system", SYSTEM_PROMPT),
+            HumanMessage(
+                content=[
+                    {
+                        "type": "text",
+                        "text": USER_PROMPT.format(
+                            summary_data=summary_data_str, csv_data=csv_data_str
+                        ),
+                    },
+                ]
+                + [
+                    {"type": "image_url", "image_url": {"url": img}}
+                    for img in self.chart_images
+                ]
+            ),
+        ]
+
+        # 创建链并调用
+        prompt = ChatPromptTemplate.from_messages(messages)
+        structured_llm = llm.with_structured_output(MarketInsightResponse)
+        chain = prompt | structured_llm
+
+        try:
+            response = chain.invoke({})
+            markdown = response.markdown
+            # 图表路径：返回数据文件夹中的 PNG 文件路径
+            charts = list(self.data_dir.glob("*.png"))
+            logger.info("报告生成成功。")
+            return {"markdown": markdown, "charts": charts}
+        except Exception as e:
+            logger.error(f"生成报告时出错: {e}")
+            raise
+
+    def save_to_directory(self, output_dir: Path) -> None:
+        """
+        将生成的报告和图表保存到指定目录。
+
+        Args:
+            output_dir: 输出目录路径。
+
+        Raises:
+            Exception: 如果保存失败。
+        """
+        try:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            report = self.generate_report()
+
+            # 保存 Markdown
+            markdown_file = output_dir / "market_insight.md"
+            with open(markdown_file, "w", encoding="utf-8") as f:
+                f.write(report["markdown"])
+            logger.info(f"保存 Markdown: {markdown_file}")
+
+            # 复制图表
+            for chart_path in report["charts"]:
+                dest = output_dir / chart_path.name
+                dest.write_bytes(chart_path.read_bytes())
+                logger.info(f"复制图表: {dest}")
+
+        except Exception as e:
+            logger.error(f"保存报告时出错: {e}")
+            raise

@@ -70,3 +70,22 @@ project_root/
 先输出最核心的数据，先尝试生成报告，根据报告质量来修改内容。
 
 ### 实现第二步：生成内容
+
+解决问题：使用llm生成关于sth-mvrv标准分数的市场洞察，并发布到twitter和币安广场等社交媒体。
+
+输入数据存储在`notebooks/sth_mvrv/outputs`目录，包含：
+
+```
+summary.json  # 核心指标和信号
+sth_mvrv_zscore.csv  # 附加数据,最后几行
+indicator_chart.png  # 核心指标图表
+```
+
+这些数据应该作为背景资料传递给llm模型。
+
+使用langchain实现交互，统一使用openrouter api, api信息存储在项目根目录下的`.env`文件。
+
+使用langchain与llm交互时需遵循以下原则：
+- 使用系统提示词定义角色和规则
+- 使用用户提示词定义具体任务（传递参数）
+- 使用结构化输出
