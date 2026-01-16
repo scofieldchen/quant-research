@@ -24,8 +24,8 @@ OUTPUT_DIR = "/users/scofield/quant-research/reports/sth_mvrv/drafts"
 # 选择支持多模态的模型
 MODEL_NAME = "google/gemini-3-flash-preview"
 
-# 系统提示词：定义角色和规则
-SYSTEM_PROMPT = """
+# 系统提示词模板：定义角色和规则
+SYSTEM_PROMPT_TEMPLATE = """
 你是一位专业的加密货币市场分析师，擅长分析指标如 STH-MVRV Z-score。你的任务是基于提供的 JSON 摘要、CSV 数据和图表，生成简洁的市场洞察报告（Markdown 格式）。重点关注趋势、信号和比特币价格影响。
 
 ### 约束条件
@@ -33,14 +33,14 @@ SYSTEM_PROMPT = """
 2. **长度**：控制在 200-500 字，避免冗长。
 3. **内容**：解释 Z-score 值、趋势，并参考图片描述视觉元素（如峰值、谷值）。
 4. **格式**：输出纯 Markdown，无额外标记。包括标题、要点和结论。
-5. **语言**：使用中文，专业且易懂。
+5. **语言**：使用 {language} 生成报告，专业且易懂。
 """
 
 # 用户提示词模板：传递具体任务参数
-USER_PROMPT = """
+USER_PROMPT_TEMPLATE = """
 {context}
 
-请基于以上数据和附加图片生成市场洞察。
+请基于以上数据和附加图片生成市场洞察，使用 {language}。
 """
 
 
@@ -58,27 +58,38 @@ class ReportGenerator:
 
     Attributes:
         data_dir (Path): 数据文件夹路径。
+        language (str): 生成内容的语言（例如 "zh" 或 "en"）。
+        system_prompt_template (str): 系统提示词模板。
+        user_prompt_template (str): 用户提示词模板。
         json_data (list[dict[str, Any]]): 加载的所有 JSON 数据列表。
         csv_data (list[pd.DataFrame]): 加载的所有 CSV 数据列表。
         chart_images (list[str]): Base64 编码的图片列表。
     """
 
-    def __init__(self, data_dir: Path):
+    def __init__(self, data_dir: Path, language: str = "zh"):
         """
         初始化报告生成器。
 
         Args:
             data_dir: 包含分析数据的文件夹路径（例如 notebooks/sth_mvrv/outputs）。
+            language: 生成内容的语言（例如 "zh" 为中文, "en" 为英文）。默认为 "zh"。
 
         Raises:
             FileNotFoundError: 如果文件夹不存在。
         """
         if not data_dir.exists():
             raise FileNotFoundError(f"数据文件夹不存在: {data_dir}")
+        if language not in ("zh", "en"):
+            raise ValueError("语言必须为中文(zh)或者英文(en)")
+
         self.data_dir = data_dir
+        self.language = language
+        self.system_prompt_template = SYSTEM_PROMPT_TEMPLATE
+        self.user_prompt_template = USER_PROMPT_TEMPLATE
         self.json_data: list[dict[str, Any]] = []
         self.csv_data: list[pd.DataFrame] = []
         self.chart_images: list[str] = []
+
         self._load_data()
 
     def _load_data(self) -> None:
@@ -159,10 +170,10 @@ class ReportGenerator:
 
         # 构建消息（多模态：文本 + 图片）
         messages = [
-            ("system", SYSTEM_PROMPT),
+            ("system", self.system_prompt_template.format(language=self.language)),
             HumanMessage(
                 content=[
-                    {"type": "text", "text": USER_PROMPT.format(context=context)},
+                    {"type": "text", "text": self.user_prompt_template.format(context=context, language=self.language)},
                 ]
                 + [
                     {"type": "image_url", "image_url": {"url": img}}
@@ -219,6 +230,6 @@ class ReportGenerator:
 
 
 if __name__ == "__main__":
-    generator = ReportGenerator(Path(INPUT_DIR))
+    generator = ReportGenerator(Path(INPUT_DIR), language="zh")
     report = generator.generate_report()
     generator.save_to_directory(Path(OUTPUT_DIR), report)
