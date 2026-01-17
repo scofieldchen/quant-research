@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.19.2"
+__generated_with = "0.19.4"
 app = marimo.App(width="medium")
 
 
@@ -9,7 +9,7 @@ def _():
     import marimo as mo
 
     from datetime import datetime, date, timedelta
-    from typing import Tuple, List
+    from pathlib import Path
 
     import duckdb
     import ffn
@@ -20,7 +20,10 @@ def _():
     import plotly.io as pio
 
     pio.templates.default = "simple_white"
-    return List, Tuple, date, datetime, duckdb, go, make_subplots, mo, np, pd
+
+    output_dir = Path("notebooks/sth_mvrv/outputs")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return date, datetime, duckdb, go, make_subplots, mo, np, output_dir, pd
 
 
 @app.cell
@@ -32,70 +35,16 @@ def _(mo):
 
 
 @app.cell
-def _(mo):
-    mo.md("""
-    ## 选择参数
-
-    ---
-    """)
-    return
+def _(duckdb, pd):
+    # 读取数据
 
 
-@app.cell
-def _(date, mo):
-    # Create UI controls for parameters
-    today = date.today()
-    default_start = date(2024, 1, 1)
-
-    parameter_form = mo.md("""
-        {zscore_window}
-
-        {start_date}
-
-        {end_date}
-        """).batch(
-        zscore_window=mo.ui.number(
-            start=10, stop=200, step=1, value=50, label="标准分数窗口"
-        ),
-        start_date=mo.ui.date(value=default_start, label="开始日期"),
-        end_date=mo.ui.date(value=today, label="结束日期"),
-    )
-
-    parameter_form
-    return (parameter_form,)
-
-
-@app.cell
-def _(mo, parameter_form):
-    mo.stop(not parameter_form.value)
-
-    zscore_window = parameter_form.value["zscore_window"]
-    start_date = parameter_form.value["start_date"]
-    end_date = parameter_form.value["end_date"]
-
-    if start_date >= end_date:
-        print("⚠️ 开始日期必需小于结束日期")
-        mo.stop(True)
-    return end_date, start_date, zscore_window
-
-
-@app.cell
-def _(duckdb, end_date, pd, start_date, zscore_window):
-    def load_sth_mvrv_data(
-        start_date: str, end_date: str, lookback_days: int
-    ) -> pd.DataFrame:
-        data_start = pd.to_datetime(start_date) - pd.Timedelta(
-            days=lookback_days + 10
-        )
-        data_start_str = data_start.strftime("%Y-%m-%d")
-
+    def load_sth_mvrv_data() -> pd.DataFrame:
         file_path = "/users/scofield/quant-research/data/cleaned/sth_mvrv.parquet"
 
         sql_query = f"""
-        SELECT datetime, sth_mvrv, btcusd 
+        SELECT datetime, sth_mvrv, open, close
         FROM '{file_path}'
-        WHERE datetime >= '{data_start_str}' 
-        AND datetime <= '{end_date}'
         ORDER BY datetime
         """
 
@@ -103,15 +52,15 @@ def _(duckdb, end_date, pd, start_date, zscore_window):
         return df
 
 
-    raw_df = load_sth_mvrv_data(start_date, end_date, zscore_window)
+    raw_df = load_sth_mvrv_data()
     # raw_df
     return (raw_df,)
 
 
 @app.cell
 def _(mo):
-    mo.md("""
-    ## STH-MVRV 指标分析
+    mo.md(r"""
+    ## 指标分析
 
     ---
     """)
@@ -119,7 +68,7 @@ def _(mo):
 
 
 @app.cell
-def _(np, pd, raw_df, start_date, zscore_window):
+def _(np, pd):
     def calculate_sth_mvrv_zscore(df: pd.DataFrame, window: int) -> pd.DataFrame:
         return (
             df.copy()
@@ -140,25 +89,14 @@ def _(np, pd, raw_df, start_date, zscore_window):
             )
             .dropna()
         )
-
-
-    # 计算标准分数
-    df_with_zscore = calculate_sth_mvrv_zscore(raw_df, zscore_window)
-
-    # 筛选数据
-    analysis_df = df_with_zscore[
-        df_with_zscore["datetime"] >= pd.to_datetime(start_date)
-    ].copy()
-
-    # analysis_df
-    return (analysis_df,)
+    return (calculate_sth_mvrv_zscore,)
 
 
 @app.cell
-def _(List, Tuple, datetime, pd):
+def _(datetime, pd):
     def find_trend_periods(
         series: pd.Series,
-    ) -> List[Tuple[datetime, datetime]]:
+    ) -> list[tuple[datetime, datetime]]:
         """找到连续的1对应的开始日期和结束日期
 
         Args:
@@ -180,19 +118,16 @@ def _(List, Tuple, datetime, pd):
             periods.append((start, end))
 
         return periods
-
-
-    # bullish_regime = analysis_df["sth_mvrv_zscore"] > 0
-    # bullish_regime.index = analysis_df["datetime"]
-    # bullish_regime
-
-    # find_trend_periods(bullish_regime)
     return (find_trend_periods,)
 
 
 @app.cell
-def _(analysis_df, find_trend_periods, go, make_subplots, pd):
-    def create_indicator_chart(df: pd.DataFrame) -> go.Figure:
+def _(datetime, go, make_subplots, pd):
+    def create_indicator_chart(
+        df: pd.DataFrame,
+        bullish_periods: list[tuple[datetime, datetime]],
+        bearish_periods: list[tuple[datetime, datetime]],
+    ) -> go.Figure:
         df_plot = df.copy()
 
         # 创建子图
@@ -200,6 +135,7 @@ def _(analysis_df, find_trend_periods, go, make_subplots, pd):
             rows=3,
             cols=1,
             shared_xaxes=True,
+            shared_yaxes=False,
             vertical_spacing=0.05,
             row_heights=[0.5, 0.25, 0.25],
             subplot_titles=(
@@ -212,8 +148,8 @@ def _(analysis_df, find_trend_periods, go, make_subplots, pd):
         # 行1: 比特币价格
         fig.add_trace(
             go.Scatter(
-                x=df_plot["datetime"],
-                y=df_plot["btcusd"],
+                x=df_plot.index,
+                y=df_plot["close"],
                 line=dict(color="#F7931A", width=2.5),
                 hovertemplate="<b>%{x}</b><br>BTCUSD: %{y:,.0f}<extra></extra>",
             ),
@@ -224,7 +160,7 @@ def _(analysis_df, find_trend_periods, go, make_subplots, pd):
         # 行2: STH-MVRV 比率
         fig.add_trace(
             go.Scatter(
-                x=df_plot["datetime"],
+                x=df_plot.index,
                 y=df_plot["sth_mvrv"],
                 line=dict(color="#2E86AB", width=2),
                 hovertemplate="<b>%{x}</b><br>STH-MVRV: %{y:.1f}<extra></extra>",
@@ -246,7 +182,7 @@ def _(analysis_df, find_trend_periods, go, make_subplots, pd):
         # 行3: 标准分数与颜色渐变
         fig.add_trace(
             go.Scatter(
-                x=df_plot["datetime"],
+                x=df_plot.index,
                 y=df_plot["sth_mvrv_zscore"],
                 mode="markers+lines",
                 line=dict(color="rgba(100,100,100,0.4)", width=1),
@@ -254,10 +190,6 @@ def _(analysis_df, find_trend_periods, go, make_subplots, pd):
                     size=4,
                     color=df_plot["sth_mvrv_zscore"],
                     colorscale="RdYlGn_r",
-                    # showscale=True,
-                    # colorbar=dict(title="Z-Score", len=0.3, y=0.15),
-                    # cmin=-3,
-                    # cmax=3,
                 ),
                 hovertemplate="<b>%{x}</b><br>Zscore: %{y:.2f}<extra></extra>",
             ),
@@ -286,12 +218,7 @@ def _(analysis_df, find_trend_periods, go, make_subplots, pd):
             annotation_text="Oversold (-2σ)",
         )
 
-        # 使用 find_trend_periods 寻找看涨和看跌时间段并添加背景色
-        # 看涨段落：zscore > 0
-        bullish_series = df_plot["sth_mvrv_zscore"] > 0
-        bullish_series.index = df_plot["datetime"]
-        bullish_periods = find_trend_periods(bullish_series)
-
+        # 添加背景色显示看涨行情
         for start, end in bullish_periods:
             fig.add_vrect(
                 x0=start,
@@ -303,11 +230,7 @@ def _(analysis_df, find_trend_periods, go, make_subplots, pd):
                 col=1,
             )
 
-        # 看跌段落：zscore < 0
-        bearish_series = df_plot["sth_mvrv_zscore"] < 0
-        bearish_series.index = df_plot["datetime"]
-        bearish_periods = find_trend_periods(bearish_series)
-
+        # 添加背景色显示看跌行情
         for start, end in bearish_periods:
             fig.add_vrect(
                 x0=start,
@@ -326,7 +249,8 @@ def _(analysis_df, find_trend_periods, go, make_subplots, pd):
                 font=dict(size=20, color="#1f2937"),
                 x=0.5,
             ),
-            height=900,
+            width=1000,
+            height=800,
             hovermode="x unified",
             showlegend=False,
             font=dict(family="Inter, sans-serif", size=12),
@@ -335,32 +259,114 @@ def _(analysis_df, find_trend_periods, go, make_subplots, pd):
         # 轴样式
         fig.update_yaxes(
             title="Price (USD)",
+            fixedrange=False,
             row=1,
             col=1,
         )
         fig.update_yaxes(
             title="MVRV Ratio",
+            fixedrange=False,
             row=2,
             col=1,
         )
         fig.update_yaxes(
             title="Z-Score",
+            fixedrange=False,
             row=3,
             col=1,
         )
 
         return fig
+    return (create_indicator_chart,)
 
 
-    indicator_chart = create_indicator_chart(analysis_df)
+@app.cell
+def _(date, mo):
+    parameter_form = mo.md("""
+        {zscore_window}
+
+        {start_date}
+
+        {end_date}
+        """).batch(
+        zscore_window=mo.ui.number(
+            start=10, stop=200, step=1, value=50, label="标准分数窗口"
+        ),
+        start_date=mo.ui.date(value="2024-01-01", label="开始日期"),
+        end_date=mo.ui.date(
+            value=date.today().strftime("%Y-%m-%d"), label="结束日期"
+        ),
+    )
+
+    parameter_form
+    return (parameter_form,)
+
+
+@app.cell
+def _(
+    calculate_sth_mvrv_zscore,
+    create_indicator_chart,
+    find_trend_periods,
+    parameter_form,
+    raw_df,
+):
+    # 计算指标
+    zscore_df = calculate_sth_mvrv_zscore(
+        raw_df, window=parameter_form.value["zscore_window"]
+    )
+    zscore_df.set_index("datetime", inplace=True)
+
+    # 筛选可视化数据
+    visualization_df = zscore_df.loc[
+        parameter_form.value["start_date"] : parameter_form.value["end_date"],
+        ["sth_mvrv", "close", "sth_mvrv_zscore"],
+    ]
+
+    # 识别看涨日期和看跌日期
+    bullish_regime = visualization_df["sth_mvrv_zscore"] > 0
+    bullish_dates = find_trend_periods(bullish_regime)
+
+    bearish_regime = visualization_df["sth_mvrv_zscore"] < 0
+    bearish_dates = find_trend_periods(bearish_regime)
+
+    # 创建指标图表
+    indicator_chart = create_indicator_chart(
+        visualization_df,
+        bullish_periods=bullish_dates,
+        bearish_periods=bearish_dates,
+    )
+    return indicator_chart, visualization_df
+
+
+@app.cell
+def _(mo, visualization_df):
+    mo.ui.table(
+        visualization_df.tail(10).round(2),
+        selection=None,
+        show_column_summaries=False,
+        show_data_types=False,
+    )
+    return
+
+
+@app.cell
+def _(indicator_chart):
     indicator_chart
-    return (indicator_chart,)
+    return
+
+
+@app.cell
+def _(indicator_chart, mo, output_dir):
+    indicator_chart_path = output_dir / "indicator_chart.png"
+    indicator_chart.write_image(indicator_chart_path, scale=1)
+    mo.md(f"**指标图表保存到**: {indicator_chart_path}")
+    return
 
 
 @app.cell
 def _(mo):
-    mo.md("""
-    ## 向量化回溯检验
+    mo.md(r"""
+    ## 回溯检验
 
     ---
     """)
@@ -368,200 +374,380 @@ def _(mo):
 
 
 @app.cell
-def _(analysis_df, np, pd):
-    def run_backtest(df: pd.DataFrame) -> pd.DataFrame:
-        backtest_df = df.copy()
+def _(go, make_subplots, np, pd):
+    class IterativeBacktest:
+        """
+        基于循环的回溯检验类，模拟真实的交易环境。
 
-        # 删除多余行
-        cols_to_drop = ["log_sth_mvrv", "rolling_mean", "rolling_std"]
-        backtest_df = backtest_df.drop(
-            columns=[col for col in cols_to_drop if col in backtest_df.columns]
-        )
+        遍历k线，根据昨天收盘的信号进行交易，以当前k线的开盘价进场和平仓。
 
-        # 生成信号
-        backtest_df["signal"] = np.where(backtest_df["sth_mvrv_zscore"] > 0, 1, -1)
+        没有考虑交易成本，回测结果只能衡量核心信号和指标是否有效，不代表历史交易的真实结果。
+        """
 
-        # 将信号滞后1并生成头寸，规避前视偏误
-        backtest_df["position"] = backtest_df["signal"].shift(1)
+        def __init__(self, data: pd.DataFrame, initial_capital: float = 10000.0):
+            required_cols = ["open", "close", "signal"]
+            if not all(col in data.columns for col in required_cols):
+                raise ValueError(f"输入数据必须包含以下列: {required_cols}")
 
-        # 计算日收益率
-        backtest_df["market_return"] = backtest_df["btcusd"].pct_change()
-        backtest_df["strategy_return"] = (
-            backtest_df["position"] * backtest_df["market_return"]
-        )
+            self.raw_data = data.copy()
+            self.initial_capital = initial_capital
 
-        # 计算净值曲线
-        backtest_df["strategy_equity"] = (
-            1 + backtest_df["strategy_return"].fillna(0)
-        ).cumprod()
-        backtest_df["market_equity"] = (
-            1 + backtest_df["market_return"].fillna(0)
-        ).cumprod()
+            self.results = None
+            self.trades_list = []
 
-        return backtest_df
+            self._run_backtest_loop()
 
+        def _run_backtest_loop(self):
+            """
+            使用 for 循环模拟逐日交易过程。
+            """
+            equity = self.initial_capital
+            current_holding = 0
 
-    backtest_results = run_backtest(analysis_df)
-    # backtest_results
-    return (backtest_results,)
+            # 交易记录变量
+            entry_price = 0.0
+            entry_time = None
+
+            # 历史记录容器
+            dates_record = []
+            equities_record = []
+            positions_record = []
+
+            # Numpy 加速提取
+            idx = self.raw_data.index
+            opens = self.raw_data["open"].values
+            closes = self.raw_data["close"].values
+            signals = self.raw_data["signal"].values
+
+            # 1. 主循环：遍历每一天
+            for i in range(1, len(self.raw_data)):
+                curr_date = idx[i]
+                prev_close = closes[i - 1]
+                curr_open = opens[i]
+                curr_close = closes[i]
+
+                # T日的决策由 T-1 信号决定
+                target_pos = signals[i - 1]
+
+                # --- 资金计算 ---
+                # 1. 隔夜盈亏 (旧持仓)
+                pct_overnight = (curr_open - prev_close) / prev_close
+                equity = equity * (1 + current_holding * pct_overnight)
+
+                # --- 交易执行检测 ---
+                if target_pos != current_holding:
+                    # 平掉旧仓位 (如果有) -> 标记为 Closed
+                    if current_holding != 0:
+                        exit_price = curr_open
+                        exit_time = curr_date
+
+                        trade_pnl = (
+                            (exit_price - entry_price)
+                            / entry_price
+                            * current_holding
+                        )
+
+                        self.trades_list.append(
+                            {
+                                "entry_time": entry_time,
+                                "entry_price": entry_price,
+                                "exit_time": exit_time,
+                                "exit_price": exit_price,
+                                "position": current_holding,
+                                "pnl_pct": trade_pnl,
+                                "status": "Closed",  # 状态：已平仓
+                            }
+                        )
+
+                    # 开新仓位
+                    if target_pos != 0:
+                        entry_price = curr_open
+                        entry_time = curr_date
+
+                    current_holding = target_pos
+
+                # 2. 日内盈亏 (新持仓)
+                pct_intraday = (curr_close - curr_open) / curr_open
+                equity = equity * (1 + current_holding * pct_intraday)
+
+                # 记录过程
+                dates_record.append(curr_date)
+                equities_record.append(equity)
+                positions_record.append(current_holding)
+
+            # 2. 循环结束后的收尾工作：处理最后一笔未平仓交易 (Open Trade)
+            if current_holding != 0:
+                # 使用最后一条数据的收盘价进行盯市(Mark-to-Market)
+                last_price = closes[-1]
+                last_date = idx[-1]
+
+                trade_pnl = (
+                    (last_price - entry_price) / entry_price * current_holding
+                )
+
+                self.trades_list.append(
+                    {
+                        "entry_time": entry_time,
+                        "entry_price": entry_price,
+                        "exit_time": last_date,  # 假设此时刻结算
+                        "exit_price": last_price,  # 结算价
+                        "position": current_holding,
+                        "pnl_pct": trade_pnl,
+                        "status": "Open",  # 状态：持仓中
+                    }
+                )
+
+            # 保存结果
+            self.results = pd.DataFrame(
+                {"equity_curve": equities_record, "position": positions_record},
+                index=dates_record,
+            )
+
+            self.results = self.results.join(
+                self.raw_data[["open", "close", "signal"]]
+            )
+
+        def get_trades(self) -> pd.DataFrame:
+            """获取交易记录"""
+            df = pd.DataFrame(self.trades_list)
+            # 确保列顺序美观（如果有数据的话）
+            if not df.empty:
+                cols = [
+                    "status",
+                    "entry_time",
+                    "entry_price",
+                    "exit_time",
+                    "exit_price",
+                    "position",
+                    "pnl_pct",
+                ]
+                return df[cols]
+            return df
+
+        def get_performance_stats(self) -> dict:
+            """
+            计算业绩指标
+            注意：Trade-based metrics 仅基于 'Closed' 交易计算。
+            """
+            all_trades = self.get_trades()
+
+            # 筛选已平仓交易
+            if not all_trades.empty:
+                closed_trades = all_trades[all_trades["status"] == "Closed"]
+            else:
+                closed_trades = pd.DataFrame()
+
+            # 1. 交易基础指标 (仅针对 Closed Trades)
+            if closed_trades.empty:
+                trade_stats = {
+                    "Total Closed Trades": 0,
+                    "Status": "No closed trades generated",
+                }
+            else:
+                total = len(closed_trades)
+                wins = len(closed_trades[closed_trades["pnl_pct"] > 0])
+                losses = len(closed_trades[closed_trades["pnl_pct"] <= 0])
+                win_rate = wins / total
+
+                gross_p = closed_trades[closed_trades["pnl_pct"] > 0][
+                    "pnl_pct"
+                ].sum()
+                gross_l = abs(
+                    closed_trades[closed_trades["pnl_pct"] <= 0]["pnl_pct"].sum()
+                )
+                pf = gross_p / gross_l if gross_l != 0 else np.inf
+
+                trade_stats = {
+                    "Total Closed Trades": total,
+                    "Win Rate": f"{win_rate:.2%}",
+                    "Profit Factor": f"{pf:.2f}",
+                    "Avg PnL (Closed)": f"{closed_trades['pnl_pct'].mean():.2%}",
+                    "Open Positions": len(all_trades)
+                    - len(closed_trades),  # 统计持仓数
+                }
+
+            # 2. 收益率基础指标 (基于净值曲线，包含 Open PnL)
+            # ffn 计算的是基于 'equity_curve' 的，这已经隐含了未平仓盈亏
+            equity_series = self.results["equity_curve"]
+            if len(equity_series) > 10:
+                perf = equity_series.calc_stats()
+                return_stats = {
+                    "Total Return": f"{perf.stats['total_return']:.2%}",
+                    "CAGR": f"{perf.stats['cagr']:.2%}",
+                    "Sharpe Ratio": f"{perf.stats['daily_sharpe']:.2f}",
+                    "Max Drawdown": f"{perf.stats['max_drawdown']:.2%}",
+                }
+            else:
+                return_stats = {"Status": "Not enough data for ffn"}
+
+            return {**trade_stats, **return_stats}
+
+        def plot_backtest_result(self, width: int = 1000, height: int = 600):
+            if self.results is None or self.results.empty:
+                print("No results")
+                return
+
+            fig = make_subplots(
+                rows=2,
+                cols=1,
+                shared_xaxes=True,
+                vertical_spacing=0.05,
+                row_heights=[0.7, 0.3],
+                subplot_titles=("Equity", "Position"),
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=self.results.index,
+                    y=self.results["equity_curve"],
+                    mode="lines",
+                    name="Equity",
+                    line=dict(color="blue"),
+                ),
+                row=1,
+                col=1,
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=self.results.index,
+                    y=self.results["position"],
+                    mode="lines",
+                    name="Position",
+                    line=dict(color="orange", width=1, shape="hv"),
+                    fill="tozeroy",
+                ),
+                row=2,
+                col=1,
+            )
+            fig.update_layout(
+                title="Backtest Results",
+                width=width,
+                height=height,
+                showlegend=False,
+            )
+
+            return fig
+    return (IterativeBacktest,)
 
 
 @app.cell
-def _(backtest_results, go, make_subplots, pd):
-    def create_backtest_chart(df: pd.DataFrame) -> go.Figure:
-        # 创建子图
-        fig = make_subplots(
-            rows=3,
-            cols=1,
-            shared_xaxes=True,
-            vertical_spacing=0.05,
-            row_heights=[0.5, 0.25, 0.25],
-            subplot_titles=(
-                "Strategy vs Market Performance",
-                "Z-Score Signal",
-                "Position History",
-            ),
-        )
+def _(date, mo):
+    backtest_parameter_form = mo.md("""
+        {zscore_window}
 
-        # 行1:净值曲线对比
-        fig.add_trace(
-            go.Scatter(
-                x=df["datetime"],
-                y=df["strategy_equity"],
-                name="Strategy",
-                line=dict(color="#2E86AB", width=3),
-                hovertemplate="<b>%{x}</b><br>Strategy: %{y:.2f}<extra></extra>",
-            ),
-            row=1,
-            col=1,
-        )
+        {start_date}
 
-        fig.add_trace(
-            go.Scatter(
-                x=df["datetime"],
-                y=df["market_equity"],
-                name="Buy & Hold",
-                line=dict(color="#F7931A", width=2, dash="dash"),
-                hovertemplate="<b>%{x}</b><br>Buy & Hold: %{y:.2f}<extra></extra>",
-            ),
-            row=1,
-            col=1,
-        )
+        {end_date}
+        """).batch(
+        zscore_window=mo.ui.number(
+            start=10, stop=200, step=1, value=50, label="标准分数窗口"
+        ),
+        start_date=mo.ui.date(value="2024-01-01", label="开始日期"),
+        end_date=mo.ui.date(
+            value=date.today().strftime("%Y-%m-%d"), label="结束日期"
+        ),
+    )
 
-        # 行2: 标准分数
-        fig.add_trace(
-            go.Scatter(
-                x=df["datetime"],
-                y=df["sth_mvrv_zscore"],
-                name="Z-Score",
-                line=dict(color="#6A4C93", width=1.5),
-                fill="tonexty",
-                fillcolor="rgba(106, 76, 147, 0.1)",
-                hovertemplate="<b>%{x}</b><br>Z-Score: %{y:.2f}<extra></extra>",
-            ),
-            row=2,
-            col=1,
-        )
-
-        # 行3: 持仓变化
-        fig.add_trace(
-            go.Scatter(
-                x=df["datetime"],
-                y=df["position"],
-                name="Position",
-                mode="lines",
-                line_shape="hv",
-                line=dict(color="#2A9D8F", width=2),
-                fill="tozeroy",
-                fillcolor="rgba(42, 157, 143, 0.3)",
-                hovertemplate="<b>%{x}</b><br>Position: %{y}<extra></extra>",
-            ),
-            row=3,
-            col=1,
-        )
-
-        # 调整布局样式
-        fig.update_layout(
-            title=dict(
-                text="STH-MVRV Strategy Backtest Analysis",
-                font=dict(size=20, color="#1f2937"),
-                x=0.5,
-            ),
-            height=900,
-            hovermode="x unified",
-            plot_bgcolor="white",
-            font=dict(family="Inter, sans-serif", size=12),
-        )
-
-        # 坐标轴样式
-        fig.update_yaxes(
-            title="Equity Value",
-            row=1,
-            col=1,
-        )
-        fig.update_yaxes(
-            title="Z-Score",
-            row=2,
-            col=1,
-        )
-        fig.update_yaxes(
-            title="Position",
-            row=3,
-            col=1,
-            tickvals=[-1, 0, 1],
-            ticktext=["Short", "Neutral", "Long"],
-        )
-
-        return fig
+    backtest_parameter_form
+    return (backtest_parameter_form,)
 
 
-    backtest_chart = create_backtest_chart(backtest_results)
+@app.cell
+def _(
+    IterativeBacktest,
+    backtest_parameter_form,
+    calculate_sth_mvrv_zscore,
+    np,
+    raw_df,
+):
+    # 获取参数
+    backtest_zscore_window = backtest_parameter_form.value["zscore_window"]
+    backtest_start_date = backtest_parameter_form.value["start_date"]
+    backtest_end_date = backtest_parameter_form.value["end_date"]
+
+    # 计算指标
+    backtest_df = calculate_sth_mvrv_zscore(raw_df, backtest_zscore_window)
+    backtest_df.set_index("datetime", inplace=True)
+    backtest_df = backtest_df.loc[backtest_start_date:backtest_end_date]
+    backtest_df.drop(
+        columns=["log_sth_mvrv", "rolling_mean", "rolling_std"], inplace=True
+    )
+
+    # 生成信号
+    # 标准分数 > 0，做多，用1表示多头信号
+    # 标准分数 < 0，做空，用-1表示空头信号
+    backtest_df["signal"] = np.where(backtest_df["sth_mvrv_zscore"] >= 0, 1, -1)
+
+    # 运行回溯检验
+    bt = IterativeBacktest(backtest_df)
+    return (bt,)
+
+
+@app.cell
+def _(bt, mo):
+    mo.ui.table(
+        bt.results,
+        selection=None,
+        show_column_summaries=False,
+        show_data_types=False,
+        format_mapping={
+            "equity_curve": "{:.1f}",
+            "open": "{:.1f}",
+            "close": "{:.1f}",
+        },
+    )
+    return
+
+
+@app.cell
+def _(bt, mo):
+    trades = bt.get_trades()
+
+
+    def style_cell(_rowId, _columnName, value):
+        if _columnName == "pnl_pct":
+            if value > 0:
+                return {
+                    "color": "green",
+                    "fontStyle": "italic",
+                }
+        return {}
+
+
+    mo.ui.table(
+        trades.tail(10),
+        selection=None,
+        show_column_summaries=False,
+        show_data_types=False,
+        format_mapping={
+            "entry_price": "{:.1f}",
+            "exit_price": "{:.1f}",
+            "entry_time": "{:%Y-%m-%d}",
+            "exit_time": "{:%Y-%m-%d}",
+            "pnl_pct": "{:.1%}",
+        },
+        style_cell=style_cell,
+    )
+    return
+
+
+@app.cell
+def _(bt):
+    bt.get_performance_stats()
+    return
+
+
+@app.cell
+def _(bt):
+    backtest_chart = bt.plot_backtest_result(width=900, height=650)
     backtest_chart
-    return
+    return (backtest_chart,)
 
 
 @app.cell
-def _():
-    # # Prepare performance data for ffn analysis
-    # perf_data = backtest_results.set_index("datetime")[
-    #     ["strategy_equity", "market_equity"]
-    # ]
-    # perf_data.columns = ["Strategy", "Benchmark"]
-
-    # # Calculate comprehensive statistics
-    # stats = ffn.calc_stats(perf_data)
-
-    # # Display performance statistics
-    # mo.md("**Detailed Performance Metrics:**")
-    # stats.display()
-    return
-
-
-@app.cell
-def _(analysis_df, indicator_chart):
-    # 将分析结果保存到本地
-
-    import json
-    from pathlib import Path
-
-    output_dir = Path("/Users/scofield/quant-research/notebooks/sth_mvrv/outputs/")
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # 关键指标和信号
-    summary = {
-        "last_date": analysis_df["datetime"].iloc[-1].strftime("%Y-%m-%d"),
-        "btcusd_price": analysis_df["btcusd"].iloc[-1],
-        "sth_mvrv": analysis_df["sth_mvrv"].iloc[-1],
-        "sth_mvrv_zscore": analysis_df["sth_mvrv_zscore"].iloc[-1],
-    }
-    with open(output_dir / "summary.json", "w") as f:
-        json.dump(summary, f, indent=2, ensure_ascii=False)
-
-    # 附加数据
-    analysis_df.tail(10).round(2).to_csv(output_dir / "sth_mvrv_zscore.csv")
-
-    # 保存图片
-    indicator_chart.write_image(output_dir / "indicator_chart.png", scale=3)
+def _(backtest_chart, mo, output_dir):
+    backtest_chart_path = output_dir / "backtest_chart.png"
+    backtest_chart.write_image(backtest_chart_path, scale=1)
+    mo.md(f"**指标图表保存到**: {backtest_chart_path}")
     return
 
 
