@@ -8,6 +8,7 @@ app = marimo.App(width="medium")
 def _():
     import marimo as mo
 
+    import json
     from datetime import datetime, date, timedelta
     from pathlib import Path
 
@@ -748,6 +749,76 @@ def _(backtest_chart, mo, output_dir):
     backtest_chart_path = output_dir / "backtest_chart.png"
     backtest_chart.write_image(backtest_chart_path, scale=1)
     mo.md(f"**指标图表保存到**: {backtest_chart_path}")
+    return
+
+
+@app.cell
+def _(bt, output_dir, pd, raw_df, visualization_df):
+    def generate_summary_report(raw_df, visualization_df, bt) -> str:
+        """生成 STH-MVRV 分析报告的 Markdown 内容。
+
+        Args:
+            raw_df (pd.DataFrame): 原始数据帧，用于提取最后日期。
+            visualization_df (pd.DataFrame): 可视化数据帧，用于指标数据表格。
+            bt: 回溯检验对象，提供业绩指标和交易数据。
+
+        Returns:
+            str: 生成的 Markdown 文档字符串。
+        """
+        # 提取关键数据
+        last_date = raw_df["datetime"].max().strftime("%Y-%m-%d")
+        indicators_tail = visualization_df.tail(30)
+        performance_stats = bt.get_performance_stats()
+        trades_tail = bt.get_trades().tail(10)
+
+        # 生成 Markdown 文档
+        markdown_content = f"""# STH-MVRV 分析报告 - {last_date}
+
+    ## 更新日期
+    {last_date}
+
+    ## 指标数据（最后30行）
+    | datetime | sth_mvrv | close | sth_mvrv_zscore |
+    |----------|----------|-------|-----------------|
+    """
+
+        for _, row in indicators_tail.iterrows():
+            markdown_content += f"| {row.name.strftime('%Y-%m-%d')} | {row['sth_mvrv']:.4f} | {row['close']:.2f} | {row['sth_mvrv_zscore']:.4f} |\n"
+
+        markdown_content += "\n## 回溯检验的业绩指标\n"
+        for key, value in performance_stats.items():
+            markdown_content += f"- {key}: {value}\n"
+
+        markdown_content += "\n## 回溯检验的历史交易（最后10笔）\n"
+        markdown_content += "| status | entry_time | entry_price | exit_time | exit_price | position | pnl_pct |\n"
+        markdown_content += "|--------|------------|-------------|-----------|------------|----------|---------|\n"
+
+        for _, row in trades_tail.iterrows():
+            entry_time = (
+                row["entry_time"].strftime("%Y-%m-%d")
+                if pd.notna(row["entry_time"])
+                else "N/A"
+            )
+            exit_time = (
+                row["exit_time"].strftime("%Y-%m-%d")
+                if pd.notna(row["exit_time"])
+                else "N/A"
+            )
+            markdown_content += f"| {row['status']} | {entry_time} | {row['entry_price']:.2f} | {exit_time} | {row['exit_price']:.2f} | {row['position']} | {row['pnl_pct']:.2%} |\n"
+
+        markdown_content += "\n## 图表\n"
+        markdown_content += "![Indicator Chart](indicator_chart.png)\n\n"
+        markdown_content += "![Backtest Chart](backtest_chart.png)\n"
+
+        return markdown_content
+
+
+    # 写入文件
+    summary_path = output_dir / "summary.md"
+    markdown_content = generate_summary_report(
+        raw_df=raw_df, visualization_df=visualization_df, bt=bt
+    )
+    summary_path.write_text(markdown_content)
     return
 
 
