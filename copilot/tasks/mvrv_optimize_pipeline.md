@@ -56,3 +56,11 @@
 需要修改`agent.md`，marimo notebook不需要测试，测试普通脚本要经过用户同意。
 
 如何使用opencode创建skills？
+
+- 让opencode生成初步文件
+- 根据最优实践修改文件
+- 测试并优化
+
+技术总结：
+- 如何创建skill.md
+- 总结创建技能文档的最佳实践。
