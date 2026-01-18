@@ -54,3 +54,5 @@
 为什么plan代理会读取那么多文件？
 
 需要修改`agent.md`，marimo notebook不需要测试，测试普通脚本要经过用户同意。
+
+如何使用opencode创建skills？
