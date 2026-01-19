@@ -17,10 +17,6 @@
   - `data/cleaned`：存储清洗数据，使用`parquet`格式。
   - `data/aggregated`：存储最终数据，例如notebook计算的指标，信号或者模型。
 
-## 约束条件
-
-遗留代码: `research/` 和 `scripts/` 是旧目录，**严禁**读取、引用或修改其中的内容。
-
 ## Python 编码规范
 
 ### 1. 代码风格与版本
