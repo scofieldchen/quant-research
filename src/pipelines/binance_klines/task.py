@@ -18,13 +18,13 @@ from src.pipelines.binance_klines.downloader import (
 )
 from src.pipelines.binance_klines.storage import save_monthly_data, get_last_timestamp
 
-logger = get_logger("binancekline")
+logger = get_logger("kline")
 
 # 全局配置
 BASE_DATA_PATH = Path("data/cleaned")
 TICKERS_FILE = BASE_DATA_PATH / "binance_tickers_perp.parquet"
 
-app = typer.Typer(help="Binance k线数据管道任务")
+app = typer.Typer(help="Binance k线数据管道任务", add_completion=False)
 
 
 def get_active_tickers(symbols: list[str] | None = None) -> pd.DataFrame:
@@ -148,14 +148,7 @@ def backfill(
     end_date: str = typer.Option(None, "--end-date", help="结束日期 YYYYMMDD"),
     max_workers: int = typer.Option(5, help="最大线程数"),
 ):
-    """回填历史数据。
-
-    Args:
-        symbols: 交易对列表，逗号分隔
-        start_date: 开始日期 YYYYMMDD
-        end_date: 结束日期 YYYYMMDD
-        max_workers: 最大线程数
-    """
+    """回填历史数据"""
     # 解析参数
     symbol_list = symbols.split(",") if symbols else None
     start_dt = (
@@ -326,14 +319,7 @@ def update(
         None, "--proxy", help="使用代理，例如http://127.0.0.1:7890"
     ),
 ):
-    """增量更新最新数据。
-
-    Args:
-        symbols: 交易对列表，逗号分隔
-        start_date: 开始日期 YYYYMMDD
-        end_date: 结束日期 YYYYMMDD
-        max_workers: 最大线程数
-    """
+    """增量更新最新数据"""
     symbol_list = symbols.split(",") if symbols else None
 
     # 解析日期

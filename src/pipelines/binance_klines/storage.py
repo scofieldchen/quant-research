@@ -10,7 +10,7 @@ import pyarrow.parquet as pq
 
 from src.core.logger import get_logger
 
-logger = get_logger("binancekline")
+logger = get_logger("kline")
 
 
 def save_monthly_data(

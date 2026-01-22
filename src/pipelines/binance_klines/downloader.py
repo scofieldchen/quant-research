@@ -19,7 +19,7 @@ from tenacity import (
 
 from src.core.logger import get_logger
 
-logger = get_logger("binancekline")
+logger = get_logger("kline")
 
 KLINE_FIELDS = [
     "open_time",  # k线开盘时间，unix 时间戳格式
