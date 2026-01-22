@@ -14,10 +14,6 @@ from src.pipelines.binance_klines.downloader import (
     fetch_api,
     fetch_historical,
 )
-from src.pipelines.binance_klines.storage import (
-    get_last_timestamp,
-    save_monthly_data,
-)
 from src.pipelines.binance_klines.task import backfill, update
 
 
@@ -61,54 +57,6 @@ def test_downloader():
 
 
 @app.command()
-def test_storage():
-    """测试存储模块"""
-    import pandas as pd
-
-    # 创建测试目录
-    test_cleaned_dir = DATA_DIR / "cleaned" / "binance_klines_perp_m1"
-    test_cleaned_dir.mkdir(parents=True, exist_ok=True)
-
-    # 创建测试数据（索引为datetime，列为OHLCV）
-    sample_data = pd.DataFrame(
-        {
-            "open": [100] * 10,
-            "high": [101] * 10,
-            "low": [99] * 10,
-            "close": [100.5] * 10,
-            "volume": [1000] * 10,
-        },
-        index=pd.date_range("2023-01-01 10:00:00", periods=10, freq="1min", tz="UTC"),
-    )
-
-    # 先保存月度数据
-    try:
-        save_monthly_data(sample_data, "btcusdt", "2023-01", test_cleaned_dir)
-        console.print("月度数据保存成功")
-    except Exception as e:
-        console.print(f"月度数据保存失败: {e}")
-        raise
-
-    # 然后查询最后时间戳
-    try:
-        last_ts = get_last_timestamp("btcusdt", test_cleaned_dir)
-        console.print(f"最后时间戳: {last_ts}")
-    except Exception as e:
-        console.print(f"最后时间戳查询失败: {e}")
-        raise
-
-    # 查询所有数据验证
-    query = f"""
-    SELECT *
-    FROM read_parquet('{test_cleaned_dir}/**/*.parquet', hive_partitioning=true)
-    """
-    df = duckdb.sql(query).df()
-    console.print(df)
-
-    console.print(sample_data)
-
-
-@app.command()
 def test_backfill():
     """测试回填历史数据"""
     # 指定交易对和时间范围，下载数据并且存储到正确的目录
@@ -126,7 +74,7 @@ def test_update():
     """测试更新增量数据"""
     # 更新指定交易对和时间范围的数据，并且成功覆盖原始文件
 
-    symbol = "btcusdt"
+    symbol = "btcusdt,ethusdt"
     start_date = None
     end_date = None
     proxy = "http://127.0.0.1:7890"

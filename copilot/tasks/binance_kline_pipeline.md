@@ -98,5 +98,3 @@ data/cleaned/binance_klines_perp_m1/
 如果每天下载数据，虽然精度更高，但是会耗费大量时间。
 
 能够成功更新数据，除了数据精度外，程序能够正常运行。
-
-get_last_timestamp: 当使用多线程同时查询parquet文件时，报错：Invalid Input Error: Attempting to execute an unsuccessful or closed pending query result.

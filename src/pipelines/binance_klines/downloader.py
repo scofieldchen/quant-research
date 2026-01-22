@@ -181,12 +181,7 @@ def fetch_api(
     Returns:
         pd.DataFrame: OHLCV 数据
     """
-    exchange = ccxt.binanceusdm(
-        {
-            "enableRateLimit": True,
-            "rateLimit": 1000,  # 每秒 1 个请求
-        }
-    )
+    exchange = ccxt.binanceusdm()
     if proxy:
         exchange.proxies = proxy
 
@@ -206,7 +201,7 @@ def fetch_api(
                 break
             res.extend(data)
             start_ts = data[-1][0] + 60000  # 下一分钟
-            time.sleep(1)  # 遵守限速
+            time.sleep(0.2)  # 限制请求速度
         except Exception as e:
             logger.error(f"获取 {ticker} 数据时出错: {e}")
             break

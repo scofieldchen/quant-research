@@ -223,7 +223,8 @@ def read_existing_month_data(
 
     query = f"SELECT * FROM read_parquet('{base_path}/symbol={symbol}/period={period}/data.parquet')"
     try:
-        df = duckdb.sql(query).df()
+        with duckdb.connect() as con:
+            df = con.sql(query).df()
         return df
     except Exception:
         return pd.DataFrame(
@@ -280,7 +281,6 @@ def update_symbol(
                 AssetType.PERP,
                 PartitionInterval.DAILY,
             )
-            logger.info(f"下载{symbol} {day_dt:%Y%m%d}成功(数据仓库)")
         except Exception:
             try:
                 # 回退 API
@@ -288,10 +288,11 @@ def update_symbol(
                     current, dt.time.min, tzinfo=dt.timezone.utc
                 )
                 if proxy:
-                    df = fetch_api(symbol, start_ts, proxy={"http": proxy, "https": proxy})
+                    df = fetch_api(
+                        symbol, start_ts, proxy={"http": proxy, "https": proxy}
+                    )
                 else:
                     df = fetch_api(symbol, start_ts)
-                logger.info(f"下载{symbol} {day_dt:%Y%m%d}成功(API)")
             except Exception as e:
                 logger.warning(f"下载{symbol} {current} 数据失败: {e}")
 
@@ -321,7 +322,9 @@ def update(
     start_date: str = typer.Option(None, "--start-date", help="开始日期 YYYYMMDD"),
     end_date: str = typer.Option(None, "--end-date", help="结束日期 YYYYMMDD"),
     max_workers: int = typer.Option(5, help="最大线程数"),
-    proxy: str = typer.Option(None, "--proxy", help="使用代理，例如http://127.0.0.1:7890")
+    proxy: str = typer.Option(
+        None, "--proxy", help="使用代理，例如http://127.0.0.1:7890"
+    ),
 ):
     """增量更新最新数据。
 
@@ -354,7 +357,9 @@ def update(
             symbol = row["symbol"]
             onboard_dt = row["onboard_date"]
             futures.append(
-                executor.submit(update_symbol, symbol, onboard_dt, start_dt, end_dt, proxy)
+                executor.submit(
+                    update_symbol, symbol, onboard_dt, start_dt, end_dt, proxy
+                )
             )
 
         for future in as_completed(futures):

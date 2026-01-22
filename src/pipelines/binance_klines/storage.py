@@ -70,7 +70,8 @@ def get_last_timestamp(
     """
 
     try:
-        result = duckdb.sql(query).df()
+        with duckdb.connect() as con:
+            result = con.sql(query).df()
         if result.empty or result["max_datetime"].isna().all():
             logger.warning(f"未找到{symbol}的数据")
             return None
