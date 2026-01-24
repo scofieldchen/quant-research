@@ -240,13 +240,10 @@ def fetch_api(
             start_ts = data[-1][0] + 60000  # 下一分钟
             time.sleep(0.5)  # 限制请求速度
         except Exception as e:
-            logger.error(f"获取 {ticker} 数据时出错: {e}")
-            break
+            raise e
 
     if not res:
-        return pd.DataFrame(
-            columns=["datetime", "open", "high", "low", "close", "volume"]
-        )
+        raise Exception("API 返回空数据")
 
     df = (
         pd.DataFrame(
