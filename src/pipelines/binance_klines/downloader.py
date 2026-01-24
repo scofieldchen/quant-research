@@ -205,7 +205,7 @@ def fetch_api(
     ticker: str,
     start_date: dt.datetime,
     end_date: dt.datetime | None = None,
-    proxy: dict | None = None,
+    proxy: str | None = None,
 ) -> pd.DataFrame:
     """从 Binance API 获取实时数据，使用 ccxt。
 
@@ -220,7 +220,7 @@ def fetch_api(
     """
     exchange = ccxt.binanceusdm()
     if proxy:
-        exchange.proxies = proxy
+        exchange.proxies = {"http": proxy, "https": proxy}
 
     if end_date is None:
         end_date = dt.datetime.now(dt.timezone.utc)
@@ -238,7 +238,7 @@ def fetch_api(
                 break
             res.extend(data)
             start_ts = data[-1][0] + 60000  # 下一分钟
-            time.sleep(0.2)  # 限制请求速度
+            time.sleep(0.5)  # 限制请求速度
         except Exception as e:
             logger.error(f"获取 {ticker} 数据时出错: {e}")
             break
