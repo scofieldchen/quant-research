@@ -9,7 +9,7 @@ from io import BytesIO
 import ccxt
 import pandas as pd
 import requests
-from requests.exceptions import ConnectionError, ConnectTimeout
+from requests.exceptions import ConnectionError, ConnectTimeout, HTTPError
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -18,6 +18,7 @@ from tenacity import (
 )
 
 from src.core.logger import get_logger
+from src.pipelines.binance_klines.exceptions import DataNotFoundError
 
 logger = get_logger("kline")
 
@@ -120,19 +121,33 @@ def get_url(
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=1, max=10),
-    retry=retry_if_exception_type((ConnectionError, ConnectTimeout)),
+    retry=retry_if_exception_type((ConnectionError, ConnectTimeout, HTTPError)),
 )
-def get_zipfile(url: str, columns: list[str]) -> pd.DataFrame:
+def get_zipfile(
+    url: str, columns: list[str], session: requests.Session | None = None
+) -> pd.DataFrame:
     """从 zipfile 获取数据帧
 
     Args:
         url: zipfile URL
         columns: 数据帧列名
+        session: requests.Session 实例，用于复用连接
 
     Returns:
         pd.DataFrame
+
+    Raises:
+        DataNotFoundError: 如果数据不存在 (HTTP 404)
     """
-    resp = requests.get(url)
+    if session is None:
+        session = requests.Session()
+
+    resp = session.get(url)
+
+    # 检查是否为 404 数据不存在
+    if resp.status_code == 404:
+        raise DataNotFoundError(f"数据不存在: {url}", url=url)
+
     resp.raise_for_status()
 
     with zipfile.ZipFile(BytesIO(resp.content)) as zip_file:
@@ -142,9 +157,15 @@ def get_zipfile(url: str, columns: list[str]) -> pd.DataFrame:
             first_char = csv_file.read(1)
             csv_file.seek(0)
             if str(first_char, encoding="UTF8").isdigit():
-                return pd.read_csv(csv_file, header=None, names=columns)
+                df = pd.read_csv(csv_file, header=None, names=columns)
             else:
-                return pd.read_csv(csv_file)
+                df = pd.read_csv(csv_file)
+
+            # 简单校验数据完整性
+            if df.empty:
+                raise ValueError(f"下载的数据为空: {url}")
+
+            return df
 
 
 def fetch_historical(
@@ -153,10 +174,26 @@ def fetch_historical(
     date: dt.datetime,
     asset_type: AssetType,
     partition: PartitionInterval,
+    session: requests.Session | None = None,
 ) -> pd.DataFrame:
-    """从 Binance Vision 获取历史 k线数据"""
+    """从 Binance Vision 获取历史 k线数据
+
+    Args:
+        ticker: 交易对
+        granularity: 粒度
+        date: 日期
+        asset_type: 资产类型
+        partition: 分区间隔
+        session: requests.Session 实例，用于复用连接
+
+    Returns:
+        pd.DataFrame: k线数据
+
+    Raises:
+        DataNotFoundError: 如果数据不存在
+    """
     url = get_url(ticker, granularity, date, asset_type, partition)
-    df = get_zipfile(url, KLINE_FIELDS)
+    df = get_zipfile(url, KLINE_FIELDS, session)
     df = df.drop(columns=["close_time", "ignore"])
     df["datetime"] = pd.to_datetime(df["open_time"], unit="ms", utc=True)
     df = df.drop(columns=["open_time"])

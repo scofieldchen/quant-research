@@ -29,7 +29,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 def test_downloader():
     """测试下载模块"""
     ticker = "btcusdt"
-    date = dt.datetime(2023, 1, 1)
+    date = dt.datetime(2019, 1, 1)
 
     # 测试历史数据下载
     try:
@@ -46,14 +46,14 @@ def test_downloader():
         console.print(e)
 
     # 测试 API 数据下载，本地测试需要使用代理
-    try:
-        start = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=5)
-        proxy = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
-        df_api = fetch_api(ticker, start, proxy=proxy)
-        console.print(df_api.head())
-        console.print(df_api.tail())
-    except Exception as e:
-        console.print(e)
+    # try:
+    #     start = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=5)
+    #     proxy = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
+    #     df_api = fetch_api(ticker, start, proxy=proxy)
+    #     console.print(df_api.head())
+    #     console.print(df_api.tail())
+    # except Exception as e:
+    #     console.print(e)
 
 
 @app.command()
