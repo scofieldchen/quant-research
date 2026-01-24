@@ -17,7 +17,10 @@ from src.pipelines.binance_klines.downloader import (
     fetch_api,
     fetch_historical,
 )
-from src.pipelines.binance_klines.exceptions import DataNotFoundError
+from src.pipelines.binance_klines.exceptions import (
+    DataNotFoundError,
+    IncompleteUpdateError,
+)
 from src.pipelines.binance_klines.storage import save_monthly_data, get_last_timestamp
 
 logger = get_logger("kline")
@@ -29,6 +32,8 @@ TICKERS_FILE = BASE_DATA_PATH / "binance_tickers_perp.parquet"
 # 币安合约历史数据仓库的最早有效日期
 EARLIEST_REPO_DATE = pd.Timestamp("2020-01-01", tz="UTC")
 
+app = typer.Typer(help="Binance k线数据管道任务", add_completion=False)
+
 
 class BinanceKlinePipeline:
     """Binance 永续合约 K线数据管道类。
@@ -36,15 +41,19 @@ class BinanceKlinePipeline:
     统一管理历史回填和增量更新的调度逻辑。
     """
 
-    def __init__(self, max_workers: int = 5, proxy: str | None = None):
+    def __init__(
+        self, max_workers: int = 5, proxy: str | None = None, max_retries: int = 3
+    ):
         """初始化管道。
 
         Args:
             max_workers: 最大并发线程数
             proxy: 代理设置
+            max_retries: 最大重试轮数
         """
         self.max_workers = max_workers
         self.proxy = proxy
+        self.max_retries = max_retries
         self.session = requests.Session()
         if proxy:
             self.session.proxies = {"http": proxy, "https": proxy}
@@ -53,6 +62,58 @@ class BinanceKlinePipeline:
         self.failed_tasks: list[dict] = []
         self.missing_data: list[dict] = []
         self.success_count = 0
+
+    def _execute_with_retry(self, tasks, worker_func):
+        """通用的多轮重试调度器。
+
+        Args:
+            tasks: 初始任务列表
+            worker_func: 工作函数
+        """
+        current_tasks = tasks
+        for attempt in range(self.max_retries):
+            logger.info(f"第 {attempt + 1} 轮执行，任务数: {len(current_tasks)}")
+
+            # 清空当前失败列表，为本轮收集做准备
+            self.failed_tasks.clear()
+
+            self._process_tasks(current_tasks, worker_func)
+
+            if not self.failed_tasks:
+                logger.info(f"第 {attempt + 1} 轮执行完毕，无失败任务")
+                break
+
+            logger.warning(
+                f"第 {attempt + 1} 轮执行完毕，失败任务数: {len(self.failed_tasks)}"
+            )
+
+            # 转换失败任务为下一轮的任务
+            next_tasks = []
+            for t in self.failed_tasks:
+                if "failed_dates" in t:
+                    # 增量更新补漏任务
+                    next_tasks.append(
+                        (t["symbol"], t["onboard_date"], t["failed_dates"], None, None)
+                    )
+                elif "period" in t:
+                    # 历史回填补漏任务
+                    next_tasks.append((t["symbol"], t["period"], t["onboard_date"]))
+                elif "start_override" in t:
+                    # 增量更新严重错误补跑
+                    next_tasks.append(
+                        (
+                            t["symbol"],
+                            t["onboard_date"],
+                            None,
+                            t.get("start_override"),
+                            t.get("end_override"),
+                        )
+                    )
+
+            current_tasks = next_tasks
+
+        if self.failed_tasks:
+            logger.error(f"达到最大重试次数，最终失败任务数: {len(self.failed_tasks)}")
 
     def run_backfill(
         self,
@@ -105,17 +166,8 @@ class BinanceKlinePipeline:
 
         logger.info(f"开始回填，共{len(tasks)}个任务，使用{self.max_workers}线程")
 
-        # 执行任务
-        self._process_tasks(tasks, worker_func=self._download_month_task)
-
-        # 重试失败任务
-        if self.failed_tasks:
-            logger.info(f"开始重试{len(self.failed_tasks)}个失败任务")
-            retry_tasks = [
-                (t["symbol"], t["period"], t["onboard_date"]) for t in self.failed_tasks
-            ]
-            self.failed_tasks.clear()  # 清空重试
-            self._process_tasks(retry_tasks, worker_func=self._download_month_task)
+        # 执行任务（带重试）
+        self._execute_with_retry(tasks, worker_func=self._download_month_task)
 
         # 生成报告
         self._generate_report("backfill")
@@ -135,7 +187,15 @@ class BinanceKlinePipeline:
         """
         symbol_list = symbols.split(",") if symbols else None
 
-        # 解析日期（在 _update_symbol_task 中处理）
+        # 解析日期范围
+        user_start = (
+            dt.datetime.strptime(start_date, "%Y%m%d").date() if start_date else None
+        )
+        user_end = (
+            dt.datetime.strptime(end_date, "%Y%m%d").date()
+            if end_date
+            else dt.date.today()
+        )
 
         # 获取活跃交易对
         tickers_df = get_active_tickers(symbol_list)
@@ -147,20 +207,15 @@ class BinanceKlinePipeline:
             f"开始更新，共{len(tickers_df)}个交易对，使用{self.max_workers}线程"
         )
 
-        # 生成任务列表：(symbol, onboard_date)
+        # 生成任务列表：(symbol, onboard_date, failed_dates, start_override, end_override)
+        # 初始化时，failed_dates 为空，由用户指定的范围驱动
         tasks = [
-            (row["symbol"], row["onboard_date"]) for _, row in tickers_df.iterrows()
+            (row["symbol"], row["onboard_date"], None, user_start, user_end)
+            for _, row in tickers_df.iterrows()
         ]
 
-        # 执行任务
-        self._process_tasks(tasks, worker_func=self._update_symbol_task)
-
-        # 重试失败任务
-        if self.failed_tasks:
-            logger.info(f"开始重试{len(self.failed_tasks)}个失败任务")
-            retry_tasks = [(t["symbol"], t["onboard_date"]) for t in self.failed_tasks]
-            self.failed_tasks.clear()
-            self._process_tasks(retry_tasks, worker_func=self._update_symbol_task)
+        # 执行任务（带重试）
+        self._execute_with_retry(tasks, worker_func=self._update_symbol_task)
 
         # 生成报告
         self._generate_report("update")
@@ -250,31 +305,49 @@ class BinanceKlinePipeline:
         """更新单个交易对的最新数据任务。
 
         Args:
-            task: (symbol, onboard_date)
+            task: (symbol, onboard_date, specific_dates, start_override, end_override)
 
         Raises:
-            Exception: 更新失败时抛出
+            IncompleteUpdateError: 更新不完整时抛出
+            Exception: 其他严重错误时抛出
         """
-        symbol, onboard_date = task
+        symbol, onboard_date, specific_dates, start_override, end_override = task
+        failed_dates = []
 
         try:
-            last_ts = get_last_timestamp(symbol)
-            effective_start = (
-                last_ts.date()
-                if last_ts
-                else max(onboard_date.date(), EARLIEST_REPO_DATE.date())
-            )
-            end_date = dt.date.today()
+            if specific_dates:
+                # 补漏模式：仅处理指定的日期
+                dates_to_process = sorted(specific_dates)
+                logger.info(f"补漏模式：{symbol} 处理 {len(dates_to_process)} 个日期")
+            else:
+                # 范围更新模式
+                last_ts = get_last_timestamp(symbol)
 
-            if effective_start > end_date:
-                logger.info(f"{symbol} 数据已是最新")
-                return
+                # 优先级逻辑：用户指定范围 > 自动续接
+                effective_start = start_override or (
+                    last_ts.date()
+                    if last_ts
+                    else max(onboard_date.date(), EARLIEST_REPO_DATE.date())
+                )
+                effective_end = end_override or dt.date.today()
 
-            logger.info(f"更新{symbol} 从 {effective_start} 到 {end_date}")
+                if effective_start > effective_end:
+                    logger.info(
+                        f"{symbol} 无需更新 (范围: {effective_start} -> {effective_end})"
+                    )
+                    return
+
+                logger.info(f"更新{symbol} 从 {effective_start} 到 {effective_end}")
+
+                # 生成日期列表
+                dates_to_process = []
+                curr = effective_start
+                while curr <= effective_end:
+                    dates_to_process.append(curr)
+                    curr += dt.timedelta(days=1)
 
             merged_data = {}  # period -> df
-            current = effective_start
-            while current <= end_date:
+            for current in dates_to_process:
                 period = current.strftime("%Y-%m")
                 if period not in merged_data:
                     merged_data[period] = read_existing_month_data(symbol, period)
@@ -294,15 +367,25 @@ class BinanceKlinePipeline:
                         PartitionInterval.DAILY,
                         session=self.session,
                     )
-                except Exception:
+                except DataNotFoundError:
+                    # 如果 ZIP 不存在，尝试 API
                     try:
-                        # 回退 API
                         start_ts = dt.datetime.combine(
                             current, dt.time.min, tzinfo=dt.timezone.utc
                         )
                         df = fetch_api(symbol, start_ts)
+                        if df.empty:
+                            # API 也无数据，可能是当天数据尚未产生，或者确实没有
+                            if current < dt.date.today():
+                                logger.warning(f"{symbol} {current} API 返回空数据")
+                                failed_dates.append(current)
                     except Exception as e:
-                        logger.warning(f"下载{symbol} {current} 数据失败: {e}")
+                        logger.warning(f"下载{symbol} {current} API 出错: {e}")
+                        failed_dates.append(current)
+                except Exception as e:
+                    # 其他网络错误等
+                    logger.warning(f"下载{symbol} {current} ZIP 出错: {e}")
+                    failed_dates.append(current)
 
                 if df is not None and not df.empty:
                     df = clean_kline_data(df)
@@ -314,8 +397,6 @@ class BinanceKlinePipeline:
                             [data_to_merge, df]
                         ).drop_duplicates(subset="datetime", keep="last")
 
-                current += dt.timedelta(days=1)
-
             # 保存每个月的合并数据
             for period, df in merged_data.items():
                 if not df.empty:
@@ -323,12 +404,33 @@ class BinanceKlinePipeline:
                     save_monthly_data(df, symbol, period)
                     logger.info(f"{symbol} {period} 更新完成")
 
-        except Exception as e:
-            # 记录失败
+            # 如果存在失败日期，抛出不完整异常
+            if failed_dates:
+                raise IncompleteUpdateError(
+                    f"{symbol} 有 {len(failed_dates)} 天更新失败",
+                    symbol=symbol,
+                    failed_dates=failed_dates,
+                )
+
+        except IncompleteUpdateError as e:
+            # 记录失败任务，供下一轮重试
             self.failed_tasks.append(
                 {
                     "symbol": symbol,
                     "onboard_date": onboard_date,
+                    "failed_dates": e.failed_dates,
+                    "error": str(e),
+                }
+            )
+            raise
+        except Exception as e:
+            # 其他严重错误，记录整个任务失败
+            self.failed_tasks.append(
+                {
+                    "symbol": symbol,
+                    "onboard_date": onboard_date,
+                    "start_override": start_override,
+                    "end_override": end_override,
                     "error": str(e),
                 }
             )
@@ -363,9 +465,6 @@ class BinanceKlinePipeline:
             json.dump(report, f, indent=2, default=str)
 
         logger.info(f"报告已保存到 {report_file}")
-
-
-app = typer.Typer(help="Binance k线数据管道任务", add_completion=False)
 
 
 def get_active_tickers(symbols: list[str] | None = None) -> pd.DataFrame:
