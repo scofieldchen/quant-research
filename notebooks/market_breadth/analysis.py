@@ -14,96 +14,9 @@ def _():
     from pathlib import Path
     import numpy as np
 
-    # 预设主流交易对
-    SYMBOLS = [
-        # 1-5
-        "BTCUSDT",
-        "ETHUSDT",
-        "SOLUSDT",
-        "BNBUSDT",
-        "XRPUSDT",
-        # 6-10
-        "ZECUSDT",
-        "DOGEUSDT",
-        "BCHUSDT",
-        "SUIUSDT",
-        "LTCUSDT",
-        # 11-15
-        "1000PEPEUSDT",
-        "ADAUSDT",
-        "TRXUSDT",
-        "LINKUSDT",
-        "ENAUSDT",
-        # 16-20
-        "AVAXUSDT",
-        "UNIUSDT",
-        "NEARUSDT",
-        "XMRUSDT",
-        "AAVEUSDT",
-        # 21-25
-        "FILUSDT",
-        "AXSUSDT",
-        "DOTUSDT",
-        "APTUSDT",
-        "TAOUSDT",
-        # 26-30
-        "DASHUSDT",
-        "TONUSDT",
-        "ICPUSDT",
-        "XLMUSDT",
-        "ARBUSDT",
-        # 31-35
-        "1000SHIBUSDT",
-        "WLDUSDT",
-        "HBARUSDT",
-        "WIFUSDT",
-        "ETCUSDT",
-        # 36-40
-        "CRVUSDT",
-        "ATOMUSDT",
-        "OPUSDT",
-        "CHZUSDT",
-        "FETUSDT",
-        # 41-45
-        "ONDOUSDT",
-        "1000BONKUSDT",
-        "POLUSDT",
-        "SEIUSDT",
-        "ZROUSDT",
-        # 46-50
-        "TIAUSDT",
-        "BTCDOMUSDT",
-        "PENDLEUSDT",
-        "LDOUSDT",
-        "RENDERUSDT",
-        "BARDUSDT",
-        "SANDUSDT",
-        "INJUSDT",
-        "STRKUSDT",
-        "KAITOUSDT",
-        "BERAUSDT",
-        "ALCHUSDT",
-        "1000RATSUSDT",
-        "JUPUSDT",
-        "AVNTUSDT",
-        "SENTUSDT",
-        "CAKEUSDT",
-        "ZAMAUSDT",
-        "PARTIUSDT",
-        "ROSEUSDT",
-        "HUMAUSDT",
-        "FOGOUSDT",
-        "METUSDT",
-        "MYXUSDT",
-        "HOMEUSDT",
-        "DUSKUSDT",
-        "GUNUSDT",
-        "ATUSDT",
-        "ALGOUSDT",
-    ]
-
+    TICKER_PATH = Path("data/cleaned/binance_tickers_perp.parquet")
     DATA_PATH = Path("data/cleaned/binance_klines_perp_m1")
-    return DATA_PATH, SYMBOLS, alt, date, duckdb, mo, pd, timedelta
+    return DATA_PATH, Path, TICKER_PATH, alt, date, duckdb, mo, pd, timedelta
 
 
 @app.cell
@@ -111,7 +24,7 @@ def _(mo):
     mo.md("""
     # 市场广度分析模型 📊
 
-    本模型通过分析 20 个主流加密货币交易对的相对强弱，衡量整体市场情绪和趋势健康度。
+    本模型通过分析主流加密货币交易对的相对强弱，衡量整体市场情绪和趋势健康度。
 
     **核心指标：**
     1. **腾落线 (A/D Line)**: 衡量上涨与下跌资产数量的累积差额。
@@ -128,6 +41,8 @@ def _(date, mo, timedelta):
             r"""
             **配置分析参数**
 
+            {top_num}
+
             {ma_window}
 
             {timeframe}
@@ -136,6 +51,9 @@ def _(date, mo, timedelta):
             """
         )
         .batch(
+            top_num=mo.ui.number(
+                start=10, stop=100, step=10, value=20, label="最高市值的交易对数量"
+            ),
             ma_window=mo.ui.number(
                 start=1, stop=200, step=1, value=50, label="均线回溯期"
             ),
@@ -158,9 +76,25 @@ def _(date, mo, timedelta):
 
 
 @app.cell
-def _(DATA_PATH, SYMBOLS, duckdb, mo, params_form, timedelta):
+def _(DATA_PATH, Path, TICKER_PATH, duckdb, mo, params_form, timedelta):
     # 只有当表单提交后才执行
     mo.stop(params_form.value is None)
+
+
+    def load_top_tickers(file_path: Path, limit: int = 30) -> list[str]:
+        """加载市场排名最高的 binance 永续合约交易对"""
+        query = f"""
+        SELECT symbol,coingecko_market_cap
+        FROM '{file_path}'
+        WHERE status = 'TRADING' 
+          AND quote_asset = 'USDT'
+          AND onboard_date <= CAST('2024-01-01' AS TIMESTAMP)
+          AND base_asset NOT IN ('USDC','BUSD','FUSD','T')
+        ORDER BY coingecko_market_cap DESC
+        LIMIT {limit}
+        """
+        df = duckdb.sql(query).df()
+        return df["symbol"].to_list()
 
 
     def load_breadth_data(
@@ -205,8 +139,9 @@ def _(DATA_PATH, SYMBOLS, duckdb, mo, params_form, timedelta):
     with mo.status.spinner(title="数据加载与计算中..."):
         # 获取表单值
         form_val = params_form.value
+        top_tickers = load_top_tickers(TICKER_PATH, form_val["top_num"])
         raw_data = load_breadth_data(
-            symbols=SYMBOLS,
+            symbols=top_tickers,
             start_date=form_val["date_range"][0],
             end_date=form_val["date_range"][1],
             interval_str=form_val["timeframe"],
@@ -259,7 +194,10 @@ def _(form_val, mo, params_form, pd, raw_data):
 
 
 @app.cell
-def _(alt, pd, results_df):
+def _(alt, mo, params_form, pd, results_df):
+    mo.stop(params_form.value is None)
+
+
     def create_breadth_charts(df):
         plot_data = df.reset_index()
 
@@ -358,7 +296,9 @@ def _(alt, pd, results_df):
 
 
 @app.cell
-def _(chart_ad, chart_breadth, mo, results_df):
+def _(chart_ad, chart_breadth, mo, params_form, results_df):
+    mo.stop(params_form.value is None)
+
     latest = results_df.iloc[-1]
     prev = results_df.iloc[-2]
 
@@ -393,6 +333,44 @@ def _(chart_ad, chart_breadth, mo, results_df):
         ],
         align="center",
     )
+    return
+
+
+@app.cell
+def _(raw_data):
+    raw_data.query("symbol == 'BTCUSDT'")
+    return
+
+
+@app.cell
+def _(DATA_PATH, duckdb):
+    # date_trunc('day', datetime AT TIME ZONE 'UTC') -> 将 datetime 列截断为日期，构建一个分组对象，`AT TIME ZONE 'UTC'`是处理带时区列的标准做法，在截断之前强制转换时区为目标时区。
+    # arg_max(A, B) -> 将 B 列作为索引，找出 A 列中最大索引对应的值。
+    # read_parquet('data_dir/*/*/data.parquet', hive_partitioning=1)，使用通配符来匹配使用 hive 分区的数据集，duck会自动过滤不需要的子目录，实现快速查询。
+    # GROUP BY 1 -> 按照 select 的第一列进行分组汇总。
+    # ORDER BY 1 -> 按照 select 的第一列进行排序。
+
+    # 如果要重采样为任意时间周期，应该使用更强大的`time_bucket`
+    # time_bucket(INTERVAL 'n units', datetime)
+
+
+    query = f"""
+    SELECT
+      time_bucket(INTERVAL '4 hours', datetime AT TIME ZONE 'UTC') AS open_time,
+      arg_max(close, datetime) AS close
+    FROM read_parquet('{DATA_PATH}/*/*/data.parquet', hive_partitioning=1)
+    WHERE symbol = 'BTCUSDT'
+    GROUP BY 1
+    ORDER BY 1
+    """
+
+    tmp = duckdb.sql(query).df()
+    return (tmp,)
+
+
+@app.cell
+def _(tmp):
+    tmp
     return
 
 
