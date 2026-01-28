@@ -1,16 +1,22 @@
+import os
+import math
 from pathlib import Path
 from datetime import datetime
 
 import pandas as pd
 import requests
 from tenacity import retry, stop_after_attempt, wait_exponential
+from dotenv import load_dotenv
 
 from src.core.logger import get_logger
 
+# 加载环境变量
+load_dotenv()
 
 # 数据目录
 RAW_DIR = Path("data/raw/binance_tickers")
 CLEANED_DIR = Path("data/cleaned")
+COINGECKO_API_URL = "https://api.coingecko.com/api/v3"
 
 logger = get_logger("binance_tickers")
 
@@ -82,22 +88,98 @@ def clean_perp_tickers(data: dict) -> pd.DataFrame:
     return df
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+def fetch_coingecko_markets(api_key: str, page: int = 1) -> list[dict]:
+    """
+    从 CoinGecko 获取币种市场信息（包含市值）。
+
+    Args:
+        api_key: CoinGecko API Key.
+        page: 分页页码.
+
+    Returns:
+        List[Dict]: 币种信息列表.
+    """
+    logger.info(f"正在从 CoinGecko 获取第 {page} 页市场信息...")
+    resp = requests.get(
+        f"{COINGECKO_API_URL}/coins/markets",
+        params={
+            "vs_currency": "usd",
+            "order": "market_cap_desc",
+            "per_page": 250,
+            "page": page,
+            "x_cg_demo_api_key": api_key,
+        },
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return [
+        {
+            "coingecko_id": coin["id"],
+            "symbol": coin["symbol"].upper(),
+            "market_cap": coin["market_cap"],
+            "market_cap_rank": coin["market_cap_rank"],
+        }
+        for coin in data
+    ]
+
+
+def get_top_coingecko_coins(api_key: str, num: int = 1000) -> pd.DataFrame:
+    """
+    获取市值前 N 的 CoinGecko 币种信息并转换为 DataFrame。
+    """
+    pages = math.ceil(num / 250)
+    all_coins = []
+    for page in range(1, pages + 1):
+        all_coins.extend(fetch_coingecko_markets(api_key, page))
+
+    df_cg = pd.DataFrame(all_coins)
+    # 处理 symbol 重复：保留市值排名靠前的（rank较小的）
+    df_cg = df_cg.sort_values("market_cap_rank").drop_duplicates("symbol", keep="first")
+    return df_cg
+
+
 def task():
     """
-    主任务函数：获取并清洗 Binance 永续合约交易对数据。
+    主任务函数：获取并清洗 Binance 永续合约交易对数据，并补充市值信息。
     """
     logger.info("开始运行 binance_tickers 数据管道")
 
-    # 获取数据
+    # 1. 获取币安数据
     data = fetch_exchange_info()
+    df_binance = clean_perp_tickers(data)
 
-    # 清洗数据
-    df = clean_perp_tickers(data)
+    # 2. 获取 CoinGecko 市值数据
+    api_key = os.getenv("COINGECKO_API_KEY")
+    if not api_key:
+        logger.warning("未找到 COINGECKO_API_KEY，将跳过市值补充")
+        df_final = df_binance
+        df_final["coingecko_market_cap"] = 0
+    else:
+        try:
+            df_cg = get_top_coingecko_coins(api_key, num=2000)
+            # 合并数据：根据 base_asset 匹配 CoinGecko 的 symbol
+            df_final = (
+                df_binance.merge(
+                    df_cg[["symbol", "market_cap"]],
+                    left_on="base_asset",
+                    right_on="symbol",
+                    how="left",
+                    suffixes=("", "_cg"))
+                .rename(columns={"market_cap": "coingecko_market_cap"})
+                .fillna({"coingecko_market_cap": 0})
+                .drop(columns=["symbol_cg"])
+            )
+            logger.info("成功补充 CoinGecko 市值信息（覆盖前 2000 名）")
+        except Exception as e:
+            logger.error(f"获取 CoinGecko 数据失败: {e}")
+            df_final = df_binance
+            df_final["coingecko_market_cap"] = 0
 
-    # 保存清洗数据
+    # 3. 保存清洗数据
     CLEANED_DIR.mkdir(parents=True, exist_ok=True)
     output_file = CLEANED_DIR / "binance_tickers_perp.parquet"
-    df.to_parquet(output_file, index=False)
+    df_final.to_parquet(output_file, index=False)
     logger.info(f"清洗数据已保存到 {output_file}")
 
     logger.info("数据管道运行完成")
