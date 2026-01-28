@@ -14,28 +14,92 @@ def _():
     from pathlib import Path
     import numpy as np
 
-    # 预设 20 个主流交易对
+    # 预设主流交易对
     SYMBOLS = [
+        # 1-5
         "BTCUSDT",
         "ETHUSDT",
-        "BNBUSDT",
         "SOLUSDT",
+        "BNBUSDT",
         "XRPUSDT",
+        # 6-10
+        "ZECUSDT",
         "DOGEUSDT",
+        "BCHUSDT",
+        "SUIUSDT",
+        "LTCUSDT",
+        # 11-15
+        "1000PEPEUSDT",
         "ADAUSDT",
         "TRXUSDT",
-        "AVAXUSDT",
-        "SHIBUSDT",
-        "DOTUSDT",
         "LINKUSDT",
-        "BCHUSDT",
-        "NEARUSDT",
-        "APTUSDT",
-        "SUIUSDT",
+        "ENAUSDT",
+        # 16-20
+        "AVAXUSDT",
         "UNIUSDT",
-        "LTCUSDT",
-        "PEPEUSDT",
-        "ORDIUSDT",
+        "NEARUSDT",
+        "XMRUSDT",
+        "AAVEUSDT",
+        # 21-25
+        "FILUSDT",
+        "AXSUSDT",
+        "DOTUSDT",
+        "APTUSDT",
+        "TAOUSDT",
+        # 26-30
+        "DASHUSDT",
+        "TONUSDT",
+        "ICPUSDT",
+        "XLMUSDT",
+        "ARBUSDT",
+        # 31-35
+        "1000SHIBUSDT",
+        "WLDUSDT",
+        "HBARUSDT",
+        "WIFUSDT",
+        "ETCUSDT",
+        # 36-40
+        "CRVUSDT",
+        "ATOMUSDT",
+        "OPUSDT",
+        "CHZUSDT",
+        "FETUSDT",
+        # 41-45
+        "ONDOUSDT",
+        "1000BONKUSDT",
+        "POLUSDT",
+        "SEIUSDT",
+        "ZROUSDT",
+        # 46-50
+        "TIAUSDT",
+        "BTCDOMUSDT",
+        "PENDLEUSDT",
+        "LDOUSDT",
+        "RENDERUSDT",
+        "BARDUSDT",
+        "SANDUSDT",
+        "INJUSDT",
+        "STRKUSDT",
+        "KAITOUSDT",
+        "BERAUSDT",
+        "ALCHUSDT",
+        "1000RATSUSDT",
+        "JUPUSDT",
+        "AVNTUSDT",
+        "SENTUSDT",
+        "CAKEUSDT",
+        "ZAMAUSDT",
+        "PARTIUSDT",
+        "ROSEUSDT",
+        "HUMAUSDT",
+        "FOGOUSDT",
+        "METUSDT",
+        "MYXUSDT",
+        "HOMEUSDT",
+        "DUSKUSDT",
+        "GUNUSDT",
+        "ATUSDT",
+        "ALGOUSDT",
     ]
 
     DATA_PATH = Path("data/cleaned/binance_klines_perp_m1")
@@ -65,9 +129,9 @@ def _(date, mo, timedelta):
             **配置分析参数**
 
             {ma_window}
-        
+
             {timeframe}
-        
+
             {date_range}
             """
         )
