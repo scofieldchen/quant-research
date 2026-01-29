@@ -272,7 +272,7 @@ class BinanceKlinePipeline:
             if last_ts:
                 last_dt = last_ts.date()
             else:
-                last_dt = max(onboard_dt, EARLIEST_REPO_DATE.date())
+                last_dt = max(onboard_dt, EARLIEST_REPO_DATE)
 
             effective_start = start_dt or last_dt
             effective_end = end_dt
